@@ -23,11 +23,17 @@ void *mmap_host(size_t map_size, int dma_buf_fd) {
 }
 
 template <typename T>
-bool checkResults(T *ptr, T c, size_t count) {
-  for (int i = 0; i < count; ++ i) {
-    if (*ptr != c) return false;
-  }
-  return true;
+bool checkResults(T *ptr, T c, size_t count, int rank) {
+    bool returnval = true;
+    for (int i = 0; i < count; ++ i) {
+        if (ptr[i] != c)
+        {
+            printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
+            returnval = false;
+            return returnval;
+        }
+    }
+    return returnval;
 }
 
 int main(int argc, char* argv[]) {
@@ -48,10 +54,7 @@ int main(int argc, char* argv[]) {
 
   size_t alloc_size = 0;
 
-  if (dtype == "fp16")
-    alloc_size = count * sizeof(sycl::half);
-  else if (dtype == "float")
-    alloc_size = count * sizeof(float);
+  alloc_size = count * sizeof(sycl::half); 
 
   // init section
   auto ret = MPI_Init(&argc, &argv);
@@ -66,54 +69,59 @@ int main(int argc, char* argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   
+  printf("buffer size=%d\n", (int)(alloc_size * world));
 
   // rank 0, device 0, subdevice 0
   // rank 1, device 0, subdevice 1
   // rank 2, device 1, subdevice 0
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
-  allreducer<float> ar;
-  ar.init(queue, rank, world);
+  allreducer<sycl::half> ar;
+  ar.init(queue, rank, world, count);
   // temporal buffer used for allreduce temporal use only.
-  void* buffer = sycl::malloc_device(alloc_size, queue); 
-  queue.fill<float>((float *)buffer, (float)(rank), count); 
-  queue.wait();
-//   void* temp_buffer = NULL;
-  ar.allreduce(queue, buffer, count);
+  void* buffer = sycl::malloc_shared(alloc_size, queue);
+  using namespace __ESIMD_NS;
+  using namespace __ESIMD_ENS;
+  uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
+  int wg_size = 1;
+  sycl::event e;
+  e = queue.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class copy_kernel1>(
+          sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
+
+            simd<sycl::half, SIMD> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD;
+
+            // init buffer
+            grf = rank;
+            sycl::half * ptr = (sycl::half*)buffer;
+            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                (ptr + index, grf);
+            lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+          });
+  });
+  e.wait();
+
+  //   void* temp_buffer = NULL;
+  int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
+  ar.allreduce(queue, buffer, count, index_to_triple_buffer);
   // avoid race condition
   queue.wait();
   MPI_Barrier(MPI_COMM_WORLD);
-
-  // Check buffer contents
-  void* host_buf = sycl::malloc_host(alloc_size, queue);
-  queue.memcpy(host_buf, buffer, alloc_size);
-  queue.wait();
-
-  // Or we map the device to host
-//   int dma_buf = 0;
-//   memcpy(&dma_buf, &ipc_handle, sizeof(int));
-//   void *host_buf = mmap_host(alloc_size, dma_buf);
+  MPI_Finalize();
 
   bool check = false;
   int32_t sum = world * (world - 1) / 2;
-  if (dtype == "fp16"){
-    check = checkResults((sycl::half *)host_buf, (sycl::half)sum, count);
-    std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)host_buf)[0]<<std::endl;
-  } else {
-    check = checkResults((float*)host_buf, (float)sum, count);
-    std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((float *)host_buf)[0]<<std::endl;
-  }
+  check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank);
+  std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
   
   if (check)
     std::cout<<"Successfully fill remote buffer"<<std::endl;
   else
-    std::cout<<"Error occured when fill remote buffer"<<std::endl;
+    std::cout<<"### Error occured when fill remote buffer ###"<<std::endl;
 
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
-  // zeCheck(zeMemPutIpcHandle(l0_ctx, ipc_handle)); /* the API is added after v1.6 */
   sycl::free(buffer, queue);
-  // sycl::free(host_buf, queue);
-  munmap(host_buf, alloc_size);
 }
