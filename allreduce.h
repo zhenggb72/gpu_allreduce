@@ -173,6 +173,9 @@ public:
 
                     //to do:
                     //tune the cacheability for each IO message
+                    //tune the thread size
+                    //tune the polling freq
+                    //when allocating the temp buffer, use hard coded max count which is 262144.
 #pragma unroll
                     for (uint32_t i = 0; i < SIMD_ATOMIC; i++)
                     {
@@ -238,7 +241,7 @@ public:
 
 
 
-                    //return; //12us upto here.
+                    //return; //8us upto here.
                     
                     //wait for all the local TG to sync. Then sync the other remote GPUs
                     while (status0[0] != total_threads_needed)
@@ -246,12 +249,12 @@ public:
                         status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                             (local_sync_ptr, ramp, pred);
                     }
-                    //return; //15us upto here.
+                    //return; //10us upto here.
 
                     //once all the local TGs are sync, do fence so that other GPU can see.
                     lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
 
-                    //return; //15us upto here.
+                    //return; //10us upto here.
 
                     //wait for completion of the atomic sync
                     if (idx == 0) //The first thread checks the completion of the remote ranks
@@ -330,14 +333,14 @@ public:
                         //once the sync is done with remote ranks, signal the local threads within the same rank
                         status0 = 1;
                         local_sync_ptr = (int*)temp_sync_buffer[temp_rank];
-                        local_sync_ptr += (SIMD_ATOMIC * sizeof(int)); //point to the second half of the sync buffer
+                        local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int)) + SIMD_ATOMIC; //point to the second half of the sync buffer
                         lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                             (local_sync_ptr, ramp, status0, pred);
                     }
                     else //rest of the threads in the local rank checks the local flag atomically.
                     {
                         local_sync_ptr = (int*)temp_sync_buffer[temp_rank];
-                        local_sync_ptr += (SIMD_ATOMIC * sizeof(int)); //point to the second half of the sync buffer
+                        local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int)) + SIMD_ATOMIC; //point to the second half of the sync buffer
                         status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                             (local_sync_ptr, ramp, pred);
 
@@ -349,7 +352,7 @@ public:
 
                     }
 
-                    //return; //25ms upto here
+                    //return; //11us-25ms upto here
 
                     //reset the sync counter for the next allreduce session. Each rank reset's its own buffer
                     int buffer_index_to_reset = (buffer_index_kernel + 2) % 3;
@@ -437,7 +440,7 @@ public:
                                 ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, result.template select<SIMD, 1>(unroll_i * SIMD));
                         }
                     }
-                    //40ms upto here.
+                    //14us-29ms upto here.
 
                 });
         });

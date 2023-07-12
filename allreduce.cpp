@@ -102,24 +102,43 @@ int main(int argc, char* argv[]) {
   });
   e.wait();
 
-  //   void* temp_buffer = NULL;
-  int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
-  ar.allreduce(queue, buffer, count, index_to_triple_buffer);
+  int repetition = 4;
+  for (int i = 0; i < repetition; i++)
+  {
+      printf("rank%d: started iteration%d\n", rank, i);
+      int index_to_triple_buffer = i % 3;
+      //int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
+      ar.allreduce(queue, buffer, count, index_to_triple_buffer);
+  }
+
   // avoid race condition
   queue.wait();
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 
   bool check = false;
-  int32_t sum = world * (world - 1) / 2;
+  int32_t temp;
+  sycl::half sum;
+  if (repetition == 1)
+  {
+      sum = world * (world - 1) / 2;
+  }
+  else
+  {
+      sum = world * (world - 1) / 2;
+      for (int i = 0; i < repetition - 1; i++)
+      {
+          sum = (int)world * (int)sum;
+      }
+  }
   check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank);
   std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
   
   if (check)
-    std::cout<<"Successfully fill remote buffer"<<std::endl;
+    std::cout<< "rank" << rank << ": Successfully fill remote buffer"<<std::endl;
   else
-    std::cout<<"### Error occured when fill remote buffer ###"<<std::endl;
+    std::cout<< "rank" << rank << ":### Error occured when fill remote buffer ###"<<std::endl;
 
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
