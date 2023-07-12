@@ -16,7 +16,7 @@
 #define SIMD_ATOMIC 16
 #define MAX_RANK 8
 #define UNROLL_COUNT MAX_RANK
-#define UNROLL_SIZE 1
+#define UNROLL_SIZE 2
 #define TRIPLE_BUFFER 3
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
