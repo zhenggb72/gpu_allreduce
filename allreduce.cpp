@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
   allreducer<sycl::half> ar;
-  ar.init(queue, rank, world, count);
+  ar.init(queue, rank, world);
   // temporal buffer used for allreduce temporal use only.
   void* buffer = sycl::malloc_shared(alloc_size, queue);
   using namespace __ESIMD_NS;

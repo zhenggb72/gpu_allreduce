@@ -20,6 +20,7 @@
 #define TRIPLE_BUFFER 3
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
+#define MAX_COUNT (512*1024)
 const int kernel_inner_loop = 1;
 
 struct exchange_contents {
@@ -85,20 +86,18 @@ public:
         initialized = false;
         buffer_index = 0;
         size_per_buffer = 0;
-        data_count = 0;
     }
 
-    void init(sycl::queue& queue, uint32_t rank_in, uint32_t world_in, uint32_t size){
+    void init(sycl::queue& queue, uint32_t rank_in, uint32_t world_in){
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
         rank = rank_in;
         world = world_in;
         // temporal buffer used for allreduce temporal use only.
-        data_size_per_buffer = ((size + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop)) * SIMD * UNROLL_SIZE * kernel_inner_loop;
+        data_size_per_buffer = ((MAX_COUNT + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop)) * SIMD * UNROLL_SIZE * kernel_inner_loop;
         data_size_per_buffer = ((data_size_per_buffer * sizeof(data_type) + ALIGNMENT_BYTE - 1) / ALIGNMENT_BYTE) * ALIGNMENT_BYTE / sizeof(data_type); //aligned size
         size_per_buffer = data_size_per_buffer * sizeof(data_type) + SYNC_BYTE;
         int size_per_buffer_kernel = size_per_buffer;
-        data_count = size;
         void* local_triple_buffer = sycl::malloc_shared(size_per_buffer * TRIPLE_BUFFER, queue);
 
         uint32_t total_threads_needed = (SYNC_BYTE /sizeof(data_type) + SIMD - 1) / SIMD;
@@ -532,6 +531,5 @@ private:
     int rank, world;
     int buffer_index;
     int size_per_buffer;
-    int data_count;
     int data_size_per_buffer;
 };
