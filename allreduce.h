@@ -21,6 +21,12 @@
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
 #define MAX_COUNT (512*1024)
+#define LOOP_COUNT_LIMIT (1000000)
+#define DEBUG_DATA_SIZE 16
+#define DEBUG_THREAD_COUNT 2
+#define DEBUG_DUMP_TO_DEDICATED_OFFSET 1
+#define DEBUG 0
+
 const int kernel_inner_loop = 1;
 
 struct exchange_contents {
@@ -98,11 +104,13 @@ public:
         data_size_per_buffer = ((data_size_per_buffer * sizeof(data_type) + ALIGNMENT_BYTE - 1) / ALIGNMENT_BYTE) * ALIGNMENT_BYTE / sizeof(data_type); //aligned size
         size_per_buffer = data_size_per_buffer * sizeof(data_type) + SYNC_BYTE;
         int size_per_buffer_kernel = size_per_buffer;
+        //printf("DEBUG rank%d: init-malloc_shared\n", rank);
         void* local_triple_buffer = sycl::malloc_shared(size_per_buffer * TRIPLE_BUFFER, queue);
 
         uint32_t total_threads_needed = (SYNC_BYTE /sizeof(data_type) + SIMD - 1) / SIMD;
         int wg_size = 1;
         uint32_t buffer_offset_to_sync = data_size_per_buffer;
+        //printf("DEBUG rank%d: init-kernel\n", rank);
         sycl::event e;
         //initialize the sync buffers to 0.
         //format of the triple buffer: count_sync_count_sync_count_sync
@@ -125,13 +133,17 @@ public:
                   lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                       (ptr + index + buffer_offset_to_sync + 2 * size_per_buffer_kernel / sizeof(data_type), grf);
                   lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+
                 });
         });
         e.wait();
 
         // XXX: gain access to remote pointers
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem\n", rank);
         exchange_peer_ipc_mem(queue, local_triple_buffer);
         initialized = true;
+        //printf("DEBUG rank%d: init-end\n", rank);
+
     }
     void allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int index_to_triple_buffer){
         using namespace __ESIMD_NS;
@@ -147,15 +159,17 @@ public:
         void* temp_buffer[max_rank];
         for (uint32_t i = 0; i < world; i++){
             temp_buffer[i] = buffer[i];
+            //printf("DEBUG rank%dr%d temp_buffer base addr=0x%x%x\n", rank, i, (((uint64_t)temp_buffer[i])>>32), (uint64_t)temp_buffer[i]&0xffffffff);
         }
         void* temp_sync_buffer[max_rank];
         for (uint32_t i = 0; i < world; i++){
             temp_sync_buffer[i] = sync_buffer[i];
+            //printf("DEBUG rank%dr%d temp_sync_buffer base addr=0x%x%x\n", rank, i, (((uint64_t)temp_sync_buffer[i]) >> 32), (uint64_t)temp_sync_buffer[i] & 0xffffffff);
         }
         uint32_t temp_rank = rank;
         uint32_t temp_world = world;
         uint32_t total_threads_needed = (size + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop); //ceiling
-        printf("required gpu hw thread count = %d\n", total_threads_needed);
+        printf("rank%d iter%d required gpu hw thread count = %d\n", rank, index_to_triple_buffer, total_threads_needed);
         int wg_size = 1;
         int size_per_buffer_kernel = size_per_buffer;
         int data_size_per_buffer_kernel = data_size_per_buffer;
@@ -169,6 +183,9 @@ public:
                     uint offset = idx * SIMD * UNROLL_SIZE * kernel_inner_loop;
                     simd<data_type, max_rank * SIMD * UNROLL_SIZE> buffer; //32 registers
                     simd<ushort, SIMD_ATOMIC> ramp;
+#if DEBUG
+                    simd<int, DEBUG_DATA_SIZE> debug = -99;
+#endif
 
                     //to do:
                     //tune the cacheability for each IO message
@@ -205,13 +222,6 @@ public:
                     //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
                     simd_mask<SIMD_ATOMIC> pred;
                     simd<int, SIMD_ATOMIC>status0;
-                    simd<int, SIMD_ATOMIC>status1;
-                    simd<int, SIMD_ATOMIC>status2;
-                    simd<int, SIMD_ATOMIC>status3;
-                    simd<int, SIMD_ATOMIC>status4;
-                    simd<int, SIMD_ATOMIC>status5;
-                    simd<int, SIMD_ATOMIC>status6;
-                    simd<int, SIMD_ATOMIC>status7;
                     pred = false;
                     pred[0] = true;
                     //pred[14] = pred[15] = false;
@@ -222,140 +232,85 @@ public:
                     status0 = lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                         (local_sync_ptr, ramp, pred);
 
-#if 0
-                    //status0 = 0;
-                    for (int i = 0; i < 16*1024; i++)
+                    //wait for all the local TG to sync. Then sync the other remote GPUs
                     {
-                        float p = (float)i * i*i*i;
-                        if (sqrt(p) == 1234567890)
-                            status0 = p;
-                        else
+#if DEBUG
+                        int loop_counter = 0;
+                        debug[0] = 1111;
+                        debug[1] = loop_counter;
+                        debug[2] = temp_rank;
+                        debug[3] = buffer_index_kernel;
+#endif
+                        while (status0[0] != total_threads_needed)
+                        {
                             status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                            (local_sync_ptr, ramp, pred);
-                    }
-                    lsc_block_store<int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-                        ((int *)inout_buffer, status0);
-                    return;
+                                (local_sync_ptr, ramp, pred);
+
+#if DEBUG
+                            if (loop_counter > LOOP_COUNT_LIMIT)
+                                break;
+                            else
+                                loop_counter++;
+                            debug[0] = 1111;
+                            debug[1] = loop_counter;
+                            debug[2] = temp_rank;
+                            debug[3] = buffer_index_kernel;
 #endif
 
-
-
-                    //return; //8us upto here.
-                    
-                    //wait for all the local TG to sync. Then sync the other remote GPUs
-                    while (status0[0] != total_threads_needed)
-                    {
-                        status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                            (local_sync_ptr, ramp, pred);
+                        }
                     }
-                    //return; //10us upto here.
+
+                    //once the local level sync is done, atomically write its counter to other remote gpus' atomic counter
+                    pred = false;
+                    pred[1] = true; //use different lane for the remote gpu sync
+                    if (idx == 0) //one thread in the local gpu notifies the remote gpu of its status.
+                    {
+                        status0 = total_threads_needed;
+                        for (int i = 0; i < temp_world; i++)
+                        {
+                            int * sync_ptr = (int*)temp_sync_buffer[i]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
+                            sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
+                            lsc_atomic_update<atomic_op::add, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                                (sync_ptr, ramp, status0, pred);
+                        }
+                    }
 
                     //once all the local TGs are sync, do fence so that other GPU can see.
                     lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
 
-                    //return; //10us upto here.
-
                     //wait for completion of the atomic sync
-                    if (idx == 0) //The first thread checks the completion of the remote ranks
+                    status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                        (local_sync_ptr, ramp, pred);
+#if DEBUG
+                    int loop_counter = 0;
+
+                    debug[4] = 2222;
+                    debug[5] = loop_counter;
+                    debug[6] = temp_rank;
+                    debug[7] = buffer_index_kernel;
+#endif
+                    while (status0[1] != total_threads_needed * max_rank)
                     {
-                        if (temp_world == max_rank)
-                        {
-                            int * peer_sync_ptr0 = ((int*)temp_sync_buffer[0]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr1 = ((int*)temp_sync_buffer[1]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr2 = ((int*)temp_sync_buffer[2]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr3 = ((int*)temp_sync_buffer[3]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr4 = ((int*)temp_sync_buffer[4]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr5 = ((int*)temp_sync_buffer[5]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr6 = ((int*)temp_sync_buffer[6]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                            int * peer_sync_ptr7 = ((int*)temp_sync_buffer[7]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-
-                            status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr0, ramp, pred);
-                            status1 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr1, ramp, pred);
-                            status2 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr2, ramp, pred);
-                            status3 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr3, ramp, pred);
-                            status4 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr4, ramp, pred);
-                            status5 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr5, ramp, pred);
-                            status6 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr6, ramp, pred);
-                            status7 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (peer_sync_ptr7, ramp, pred);
-
-                            while (status0[0] + status1[0] + status2[0] + status3[0] + status4[0] + status5[0] + status6[0] + status7[0] != total_threads_needed * max_rank)
-                            {
-                                status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr0, ramp, pred);
-                                status1 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr1, ramp, pred);
-                                status2 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr2, ramp, pred);
-                                status3 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr3, ramp, pred);
-                                status4 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr4, ramp, pred);
-                                status5 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr5, ramp, pred);
-                                status6 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr6, ramp, pred);
-                                status7 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr7, ramp, pred);
-                            }
-
-                        }
-                        else
-                        {
-                            int sum = 0;
-                            for (int i = 0; i < temp_world; i++)
-                            {
-                                int * peer_sync_ptr = ((int*)temp_sync_buffer[i]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                                status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (peer_sync_ptr, ramp, pred);
-                                sum += status0[0];
-                            }
-                            while (sum != total_threads_needed * temp_world)
-                            {
-                                sum = 0;
-                                for (int i = 0; i < temp_world; i++)
-                                {
-                                    int * peer_sync_ptr = ((int*)temp_sync_buffer[i]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                                    status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                        (peer_sync_ptr, ramp, pred);
-                                    sum += status0[0];
-                                }
-                            }
-                        }
-                        //once the sync is done with remote ranks, signal the local threads within the same rank
-                        status0 = 1;
-                        local_sync_ptr = (int*)temp_sync_buffer[temp_rank];
-                        local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int)) + SIMD_ATOMIC; //point to the second half of the sync buffer
-                        lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                            (local_sync_ptr, ramp, status0, pred);
-                    }
-                    else //rest of the threads in the local rank checks the local flag atomically.
-                    {
-                        local_sync_ptr = (int*)temp_sync_buffer[temp_rank];
-                        local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int)) + SIMD_ATOMIC; //point to the second half of the sync buffer
                         status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                             (local_sync_ptr, ramp, pred);
+#if DEBUG
 
-                        while (status0[0] != 1)
-                        {
-                            status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (local_sync_ptr, ramp, pred);
-                        }
+                        if (loop_counter > LOOP_COUNT_LIMIT)
+                            break;
+                        else
+                            loop_counter++;
 
+                        debug[4] = 2222;
+                        debug[5] = loop_counter;
+                        debug[6] = temp_rank;
+                        debug[7] = buffer_index_kernel;
+#endif
                     }
-
-                    //return; //11us-25ms upto here
 
                     //reset the sync counter for the next allreduce session. Each rank reset's its own buffer
                     int buffer_index_to_reset = (buffer_index_kernel + 2) % 3;
                     status0 = 0;
+                    pred = true;
                     local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
                     local_sync_ptr += (buffer_index_to_reset * size_per_buffer_kernel / sizeof(int));
                     lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
@@ -438,12 +393,31 @@ public:
                             lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
                                 ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, result.template select<SIMD, 1>(unroll_i * SIMD));
                         }
+
+  
+#if DEBUG
+                        //write out the debug dmp
+                        if (idx == 0 || idx == 1)
+                        {
+#if DEBUG_DUMP_TO_DEDICATED_OFFSET
+                            lsc_block_store<int, DEBUG_DATA_SIZE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
+                                ((int *)inout_buffer + (SIMD * UNROLL_SIZE) * total_threads_needed / (sizeof(int) / sizeof(data_type)) + idx * DEBUG_DATA_SIZE, debug.template select<DEBUG_DATA_SIZE, 1>(0));
+#else
+                            lsc_block_store<int, DEBUG_DATA_SIZE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
+                                ((int *)inout_buffer + offset / (sizeof(int) / sizeof(sycl::half)), debug.template select<DEBUG_DATA_SIZE, 1>(0));
+#endif
+                        }
+                        //lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+#endif                        
                     }
                     //14us-29ms upto here.
 
                 });
         });
         e.wait();
+#if DEBUG
+        printf("rank%d iter%d required gpu hw thread count = %d. DONE\n", rank, index_to_triple_buffer, total_threads_needed);
+#endif
         gtimer.record(0, e);
         ctimer.stop(0);
 
@@ -453,7 +427,7 @@ public:
             if (i * temp_rank == 0x7fffffff)
                 printf(" ");
         }
-        std::cout << "rank" << temp_rank<< ": kernel us= " << gtimer.get_us(0);
+        std::cout << "rank" << temp_rank << " iter" << index_to_triple_buffer << ": kernel us= " << gtimer.get_us(0);
         std::cout << " host us= " << ctimer.get_us(0) << "\n";
 
     }
@@ -479,6 +453,7 @@ private:
 
         void *base_addr;
         size_t base_size;
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-zeMemGetAddressRange\n", rank);
         zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
 
         // Step 2: Get IPC mem handle from base address
@@ -486,41 +461,51 @@ private:
         alignas(64) exchange_contents recv_buf[world];
 
         // fill in the exchange info
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-zeMemGetIpcHandle\n", rank);
         zeCheck(zeMemGetIpcHandle(l0_ctx, base_addr, &send_buf.ipc_handle));
         send_buf.offset = (char*)ptr - (char*)base_addr;
         send_buf.pid = getpid();
 
         // Step 3: Exchange the handles and offsets
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-memset\n", rank);
         memset(recv_buf, 0, sizeof(recv_buf));
         // Overkill if we don't really needs all peer's handles
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-MPI_Allgather\n", rank);
         MPI_Allgather(
             &send_buf, sizeof(send_buf), MPI_BYTE, recv_buf, sizeof(send_buf), MPI_BYTE, MPI_COMM_WORLD);
 
         
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop\n", rank);
         for (uint32_t i = 0; i < world; i++){
             // Step 4: Prepare pid file descriptor of next process
             auto* peer = recv_buf + i;
+            //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop%d-__NR_pidfd_open\n", rank, i);
             auto pid_fd = syscall(__NR_pidfd_open, peer->pid, 0);
             sysCheck(pid_fd);
             //
             // Step 5: Duplicate GEM object handle to local process
             // and overwrite original file descriptor number
             //
+            //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop%d-__NR_pidfd_getfd\n", rank, i);
             peer->fd = syscall(__NR_pidfd_getfd, pid_fd, peer->fd, 0);
             sysCheck(peer->fd);
 
             // Step 6: Open IPC handle of remote peer
+            //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop%d-get_native\n", rank, i);
             auto l0_device
                 = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(queue.get_device());
             void* peer_base;
 
+            //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop%d-zeMemOpenIpcHandle\n", rank, i);
             zeCheck(zeMemOpenIpcHandle(
                     l0_ctx, l0_device, peer->ipc_handle, ZE_IPC_MEMORY_FLAG_BIAS_CACHED, &peer_base));
             buffer[i] = (char*)peer_base + peer->offset;
             sync_buffer[i] = (char*)peer_base + peer->offset + data_size_per_buffer * sizeof(data_type);
             offset[i] = peer->offset;
             ipc_handle[i] = send_buf.ipc_handle;
-        }    
+            //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-forloop%d-end\n", rank, i);
+        }
+        //printf("DEBUG rank%d: init-exchange_peer_ipc_mem-end\n", rank);
     }
     
     bool initialized;

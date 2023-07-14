@@ -23,9 +23,64 @@ void *mmap_host(size_t map_size, int dma_buf_fd) {
 }
 
 template <typename T>
-bool checkResults(T *ptr, T c, size_t count, int rank) {
+bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int iter) {
     bool returnval = true;
-    for (int i = 0; i < count; ++ i) {
+
+#if DEBUG_DUMP_TO_DEDICATED_OFFSET
+    //print debug info
+    //sleep(rank*0.001);
+    for (int i = count/ (sizeof(int) / sizeof(sycl::half)); i < count/(sizeof(int)/sizeof(sycl::half)) + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT; ++i) {
+        int thread_idx = (i - count / (sizeof(int) / sizeof(sycl::half))) / DEBUG_DATA_SIZE;
+        //if ((i - count / (sizeof(int) / sizeof(sycl::half))) % DEBUG_DATA_SIZE == 0)
+        //    printf("\nthread%d\n", thread_idx);
+        //printf("%d, ", ((int *)ptr)[i]);
+
+        //check the counter
+        {
+            if (((int *)ptr)[i] >= LOOP_COUNT_LIMIT)
+            {
+                int rel_idx = (i - count / (sizeof(int) / sizeof(sycl::half)));
+
+                printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n##### POTENTIAL HANG #####\n");
+                printf("counter=%d\n", ((int *)ptr)[i]);
+                printf("whileloop ID=%d\n", ((int *)ptr)[i - 1]);
+                printf("thread ID=%d\n", thread_idx);
+                printf("debug element ID=%d\n", rel_idx % DEBUG_DATA_SIZE);
+                printf("rank%d iter%d\n", ((int *)ptr)[i + 1], ((int *)ptr)[i + 2]);
+                printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+            }
+        }
+    }
+
+    if (check_output)
+    {
+        for (int i = 0; i < count; ++i) {
+            if (ptr[i] != c)
+            {
+                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
+                returnval = false;
+                return returnval;
+            }
+        }
+    }
+#else
+    //print debug info
+    //sleep(rank*0.001);
+    //printf("\nthread0\n");
+    for (int i = 0; i < 2; ++i) {
+        printf("%d, ", ((int *)ptr)[i]);
+    }
+    //printf("\nthread1\n");
+    for (int i = SIMD * UNROLL_SIZE / (sizeof(int) / sizeof(sycl::half)); i < SIMD * UNROLL_SIZE / (sizeof(int) / sizeof(sycl::half)) + 2; ++i) {
+        printf("%d, ", ((int *)ptr)[i]);
+        if (((int *)ptr)[i] >= LOOP_COUNT_LIMIT)
+        {
+            printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPOTENTIAL HANG\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        }
+
+    }
+
+    for (int i = SIMD * UNROLL_SIZE * 2; i < count; ++i) {
         if (ptr[i] != c)
         {
             printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
@@ -33,6 +88,7 @@ bool checkResults(T *ptr, T c, size_t count, int rank) {
             return returnval;
         }
     }
+#endif
     return returnval;
 }
 
@@ -77,14 +133,17 @@ int main(int argc, char* argv[]) {
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
   allreducer<sycl::half> ar;
+  //printf("DEBUG rank%d: init\n", rank);
   ar.init(queue, rank, world);
+  //printf("DEBUG rank%d: malloc_shared\n", rank);
   // temporal buffer used for allreduce temporal use only.
-  void* buffer = sycl::malloc_shared(alloc_size, queue);
+  void* buffer = sycl::malloc_shared(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
   using namespace __ESIMD_NS;
   using namespace __ESIMD_ENS;
   uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
   int wg_size = 1;
   sycl::event e;
+  //printf("DEBUG rank%d: input_init_kernel\n", rank);
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class copy_kernel1>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
@@ -103,21 +162,8 @@ int main(int argc, char* argv[]) {
   e.wait();
 
   int repetition = 4;
-  for (int i = 0; i < repetition; i++)
-  {
-      printf("rank%d: started iteration%d\n", rank, i);
-      int index_to_triple_buffer = i % 3;
-      //int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
-      ar.allreduce(queue, buffer, count, index_to_triple_buffer);
-  }
-
-  // avoid race condition
-  queue.wait();
-  MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Finalize();
-
   bool check = false;
-  int32_t temp;
+
   sycl::half sum;
   if (repetition == 1)
   {
@@ -131,14 +177,35 @@ int main(int argc, char* argv[]) {
           sum = (int)world * (int)sum;
       }
   }
-  check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank);
-  std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
+
+  printf("DEBUG rank%d: allreduce\n", rank);
+  for (int i = 0; i < repetition; i++)
+  {
+      //printf("rank%d: started iteration%d\n", rank, i);
+      int index_to_triple_buffer = i % 3;
+      //int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
+      ar.allreduce(queue, buffer, count, index_to_triple_buffer);
+#if DEBUG
+      checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, false, i);
+#endif
+  }
+
+  // avoid race condition
+  queue.wait();
+  //printf("DEBUG rank%d: MPI_Barrier\n", rank);
+  MPI_Barrier(MPI_COMM_WORLD);
+  //printf("DEBUG rank%d: MPI_Finalize\n", rank);
+  MPI_Finalize();
+
+  //printf("DEBUG rank%d: check result\n", rank);
+  check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, true, -1);
+  //std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
   
   if (check)
     std::cout<< "rank" << rank << ": Successfully fill remote buffer"<<std::endl;
   else
-    std::cout<< "rank" << rank << ":### Error occured when fill remote buffer ###"<<std::endl;
+    std::cout<< "rank" << rank << ":###################### Error occured when fill remote buffer ##############################"<<std::endl;
 
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
