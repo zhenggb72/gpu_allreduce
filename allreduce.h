@@ -12,7 +12,7 @@
 #include "ze_exception.hpp"
 #include "sycl_misc.hpp"
 
-#define SIMD 64
+#define SIMD 128
 #define SIMD_ATOMIC 16
 #define MAX_RANK 8
 #define UNROLL_COUNT MAX_RANK
@@ -181,17 +181,18 @@ public:
                     /////////////////////////////////////////////////////////////////////////////////
                     //ESIMD kernel
                     uint offset = idx * SIMD * UNROLL_SIZE * kernel_inner_loop;
-                    simd<data_type, max_rank * SIMD * UNROLL_SIZE> buffer; //32 registers
+                    simd<data_type, max_rank * SIMD * UNROLL_SIZE> buffer; //64 registers
                     simd<ushort, SIMD_ATOMIC> ramp;
 #if DEBUG
                     simd<int, DEBUG_DATA_SIZE> debug = -99;
 #endif
 
                     //to do:
-                    //tune the cacheability for each IO message
-                    //tune the thread size
+                    //O3 compiler optimization: not much difference after the change.
+                    //tune the fence: good perf improvements
+                    //tune the cacheability for each IO message: no noticeable improvement
+                    //tune the thread size: not much improvements
                     //tune the polling freq
-                    //when allocating the temp buffer, use hard coded max count which is 262144.
 #pragma unroll
                     for (uint32_t i = 0; i < SIMD_ATOMIC; i++)
                     {
@@ -202,7 +203,7 @@ public:
                     for (int i = 0; i < kernel_inner_loop; i++) {
 #pragma unroll
                         for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
-                            buffer.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                            buffer.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::cached, cache_hint::cached>
                                 ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE);
                         }
 
@@ -216,8 +217,7 @@ public:
                                 ((data_type *)local_temp_ptr + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, buffer.template select<SIMD, 1>(unroll_i * SIMD));
                         }
                     }
-                    lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
-                    //return; //upto here is about 12us.
+                    lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::gpus>();
 
                     //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
                     simd_mask<SIMD_ATOMIC> pred;
@@ -276,7 +276,7 @@ public:
                     }
 
                     //once all the local TGs are sync, do fence so that other GPU can see.
-                    lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+                    //lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::gpus>();
 
                     //wait for completion of the atomic sync
                     status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
@@ -308,16 +308,16 @@ public:
                     }
 
                     //reset the sync counter for the next allreduce session. Each rank reset's its own buffer
-                    int buffer_index_to_reset = (buffer_index_kernel + 2) % 3;
-                    status0 = 0;
-                    pred = true;
-                    local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
-                    local_sync_ptr += (buffer_index_to_reset * size_per_buffer_kernel / sizeof(int));
-                    lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                        (local_sync_ptr, ramp, status0, pred); //reset the first half of sync buffer
-                    lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                        (local_sync_ptr + SIMD_ATOMIC, ramp, status0, pred); //reset the second half of sync buffer
-
+                    if (idx == 0) //one thread in the local gpu notifies the remote gpu of its status.
+                    {
+                        int buffer_index_to_reset = (buffer_index_kernel + 2) % 3;
+                        status0 = 0;
+                        pred = true;
+                        local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
+                        local_sync_ptr += (buffer_index_to_reset * size_per_buffer_kernel / sizeof(int));
+                        lsc_atomic_update<atomic_op::store, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                            (local_sync_ptr, ramp, status0, pred); //reset the first half of sync buffer
+                    }
 
                     //at this point, all the threads are done copying data from input buffer to temp buffer.
                     //do All reduce
@@ -390,7 +390,7 @@ public:
                         //write out the results
 #pragma unroll
                         for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
-                            lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
+                            lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::write_back, cache_hint::write_back>
                                 ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, result.template select<SIMD, 1>(unroll_i * SIMD));
                         }
 

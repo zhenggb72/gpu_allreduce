@@ -1,9 +1,9 @@
 CC=icx
 CXX=icpx
 
-OPT=-g -O0
+OPT=-O3
 
-SYCLFLAGS=-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend=spir64_gen "-device pvc -internal_options -ze-intel-has-buffer-offset-arg -internal_options -cl-intel-greater-than-4GB-buffer-required"
+SYCLFLAGS=-fsycl -fsycl-targets=spir64_gen -Xsycl-target-backend=spir64_gen "-device pvc -options \"-vc-codegen\" -internal_options -ze-intel-has-buffer-offset-arg -internal_options -cl-intel-greater-than-4GB-buffer-required"
 CCL_ROOT=../ccl/release/_install
 
 INCLUDES=-I$(CCL_ROOT)/include
