@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
 
   size_t alloc_size = 0;
 
-  alloc_size = count * sizeof(sycl::half); 
+  alloc_size = count * sizeof(sycl::half);
 
   // init section
   auto ret = MPI_Init(&argc, &argv);
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
   sycl::event e;
   //printf("DEBUG rank%d: input_init_kernel\n", rank);
   e = queue.submit([&](sycl::handler& cgh) {
-      cgh.parallel_for<class copy_kernel1>(
+      cgh.parallel_for<class input_init_kernel1>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
             simd<sycl::half, SIMD> grf; //4 registers allocated.
@@ -179,16 +179,30 @@ int main(int argc, char* argv[]) {
   }
 
   printf("DEBUG rank%d: allreduce\n", rank);
-  for (int i = 0; i < repetition; i++)
-  {
-      //printf("rank%d: started iteration%d\n", rank, i);
-      int index_to_triple_buffer = i % 3;
-      //int index_to_triple_buffer = 0; //must be 0, 1 or 2. Vary this 0,1,2,0,1,2... for each allreduce calls. This is needed to successfully run the allreduce without host level sync.
-      ar.allreduce(queue, buffer, count, index_to_triple_buffer);
-#if DEBUG
-      checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, false, i);
-#endif
-  }
+  
+  //warm up runs
+  ar.allreduce(queue, buffer, count, 3, false);
+  //reinit the input buffer content
+  e = queue.submit([&](sycl::handler& cgh) {
+      cgh.parallel_for<class input_init_kernel2>(
+          sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
+
+            simd<sycl::half, SIMD> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD;
+
+            // init buffer
+            grf = rank;
+            sycl::half * ptr = (sycl::half*)buffer;
+            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                (ptr + index, grf);
+            lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+          });
+  });
+  e.wait();
+
+
+  //real runs
+  ar.allreduce(queue, buffer, count, repetition, true);
 
   // avoid race condition
   queue.wait();
