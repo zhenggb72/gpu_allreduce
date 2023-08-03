@@ -137,7 +137,7 @@ void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int t
 #pragma unroll
     for (uint32_t i = 0; i < TEMP_WORLD; i++)
     {
-        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
             (ptr + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));
     }
 }
@@ -159,13 +159,13 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
             ((T *)ptr_even + i * SIMD_ATOMIC);
     }
 #pragma unroll
     for (i = TEMP_WORLD / 2; i < TEMP_WORLD; i++)
     {
-        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
             ((T *)ptr_odd + (i - TEMP_WORLD / 2) * SIMD_ATOMIC);
     }
     sum = buffer.template select<SIMD_ATOMIC * TEMP_WORLD / 2, 1>(0) + buffer.template select<SIMD_ATOMIC * TEMP_WORLD / 2, 1>(SIMD_ATOMIC * TEMP_WORLD / 2);
@@ -179,7 +179,7 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
         {
             T * ptr = (T*)temp_buffer[i];
             ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_ATOMIC;
-            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
                 (ptr + (temp_rank / 2) * SIMD_ATOMIC, sum.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
         }
     }
@@ -190,51 +190,8 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
         {
             T * ptr = (T*)temp_buffer[i];
             ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_ATOMIC;
-            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
                 (ptr + (temp_rank / 2) * SIMD_ATOMIC, sum.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
-        }
-    }
-}
-
-template <uint32_t TEMP_WORLD, typename T>
-void distribute_input_to_ranks(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
-{
-    using namespace __ESIMD_NS;
-    using namespace __ESIMD_ENS;
-
-    //read the input data
-    uint32_t read_offset = idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
-    simd<T, SIMD_ATOMIC * TEMP_WORLD / 2> buffer;
-
-#pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
-    {
-        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-            ((T *)temp_buffer[temp_rank] + read_offset + i * SIMD_ATOMIC);
-    }
-
-    //distribute to other ranks. But even(odd) rank goes to other even(odd) rank.
-    //The distributed data will go to the second half of the temp slot. Within the second half, the data will be ordered based on rank ID.
-    if (temp_rank & 1)
-    {
-#pragma unroll
-        for (uint32_t i = 1; i < TEMP_WORLD; i += 2)
-        {
-            T * ptr = (T*)temp_buffer[i];
-            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
-            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                (ptr + (temp_rank / 2) * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
-        }
-    }
-    else
-    {
-#pragma unroll
-        for (uint32_t i = 0; i < TEMP_WORLD; i += 2)
-        {
-            T * ptr = (T*)temp_buffer[i];
-            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
-            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                (ptr + (temp_rank / 2) * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
         }
     }
 }
@@ -254,7 +211,7 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
 #pragma unroll
     for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
     {
-        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
             ((T *)ptr + i * SIMD_ATOMIC);
     }
 #pragma unroll
@@ -263,7 +220,7 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
         sum = sum + buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i);
     }
     //store the result
-    lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached> //save the all sum in the second half of the temp slot.
+    lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back> //save the all sum in the second half of the temp slot.
         (ptr, sum);
 }
 
@@ -312,13 +269,13 @@ void gather_from_remote_and_dist_to_rank_pair(int idx, void* inout_buffer, uint3
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
             (ptr_even + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));//save the results in the first half of temp slot
     }
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
             (ptr_odd + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));//save the results in the first half of temp slot
     }
 }
@@ -464,8 +421,6 @@ public:
         printf("outerloop_iter_count=%d\n", outerloop_iter_count);
         int outer_iter;
         //todo:
-        //1. Since the temp buffer can hold 64MB, for W number of ranks, (64MB * W) can be processed within a outerloop iteration. Currently only 64MB is processed.
-        //2. persistent thread. done
         //3. cache control fine tune
         //4, tune the temp buffer size so that there are whole number of waves instead of fractional waves.
         //5. prefetch in persistent threads?
