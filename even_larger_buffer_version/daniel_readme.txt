@@ -4,7 +4,7 @@ daniel's New step
 ssh connect
 sudo su     #might be required
 source /opt/intel/oneapi/setvars.sh
-cd /home/gca/cdrhee/dpcpp_and_esimd_version_large_buf
+cd /home/gca/cdrhee/dpcpp_and_esimd_version_very_large_buf
 bash ./daniel_build_run.sh
 bash ./daniel_run.sh
 

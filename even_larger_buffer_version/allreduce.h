@@ -96,7 +96,7 @@ public:
 };
 
 template <uint32_t TEMP_WORLD, typename T>
-void distribute_input_to_local_rank(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
+void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
 {
     using namespace __ESIMD_NS;
     using namespace __ESIMD_ENS;
@@ -131,52 +131,68 @@ void distribute_input_to_local_rank(int idx, void* inout_buffer, uint32_t size, 
     //sycl::_V1::ext::oneapi::experimental::printf("in: rank%d: val=%f\n", temp_rank, temp2);
 
     //use the temp buffer for the current rank to copy the data to.
-    //save the first four elements in even rank, the second four elements to odd rank. 
-    //In each rank's temp slot, first 4 elements are from even rank of the pair. The next 4 elements are from odd rank of the pair.
-    T * ptr = (T*)temp_buffer[temp_rank & 0xfffffffe];
-    ptr += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
+    //(WORLD * SIMD_ATOMIC) amount of data will be saved in the local temp buffer
+    T * ptr = (T*)temp_buffer[temp_rank];
+    ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
 #pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
+    for (uint32_t i = 0; i < TEMP_WORLD; i++)
     {
         lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
             (ptr + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));
     }
-
-    ptr = (T*)temp_buffer[temp_rank | 1];
-    ptr += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
-#pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
-    {
-        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-            (ptr + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i + SIMD_ATOMIC * TEMP_WORLD / 2));
-    }
 }
 
 template <uint32_t TEMP_WORLD, typename T>
-void local_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
+void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
 {
     using namespace __ESIMD_NS;
     using namespace __ESIMD_ENS;
 
     //read the input data
-    T * ptr = (T*)temp_buffer[temp_rank];
-    int read_offset = idx * SIMD_ATOMIC * TEMP_WORLD;
-    ptr += read_offset + size_per_buffer_kernel * buffer_index_kernel;
+    T * ptr_even = (T*)temp_buffer[temp_rank & 0xfffffffe] + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
+    T * ptr_odd = (T*)temp_buffer[temp_rank | 1] + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
+    ptr_even += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
+    ptr_odd += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
     simd<T, SIMD_ATOMIC * TEMP_WORLD / 2> sum;
     simd<T, SIMD_ATOMIC * TEMP_WORLD> buffer;
+    uint32_t i;
 #pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD; i++)
+    for (i = 0; i < TEMP_WORLD / 2; i++)
     {
         buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-            ((T *)ptr + i * SIMD_ATOMIC);
+            ((T *)ptr_even + i * SIMD_ATOMIC);
+    }
+#pragma unroll
+    for (i = TEMP_WORLD / 2; i < TEMP_WORLD; i++)
+    {
+        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            ((T *)ptr_odd + (i - TEMP_WORLD / 2) * SIMD_ATOMIC);
     }
     sum = buffer.template select<SIMD_ATOMIC * TEMP_WORLD / 2, 1>(0) + buffer.template select<SIMD_ATOMIC * TEMP_WORLD / 2, 1>(SIMD_ATOMIC * TEMP_WORLD / 2);
 
-    //store the result in the first half of the temp buffer slot. The second half will be used for all reduction.
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
+    //store the result in at (SIMD_ATOMIC * TEMP_WORLD) offset in remote ranks' temp buffers.
+    //distribute to other ranks. But even(odd) rank goes to other even(odd) rank.
+    if (temp_rank & 1)
     {
-        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-            ((T *)ptr + i * SIMD_ATOMIC, sum.template select<SIMD_ATOMIC, 1>(i * SIMD_ATOMIC));
+#pragma unroll
+        for (uint32_t i = 1; i < TEMP_WORLD; i += 2)
+        {
+            T * ptr = (T*)temp_buffer[i];
+            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_ATOMIC;
+            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                (ptr + (temp_rank / 2) * SIMD_ATOMIC, sum.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
+        }
+    }
+    else
+    {
+#pragma unroll
+        for (uint32_t i = 0; i < TEMP_WORLD; i += 2)
+        {
+            T * ptr = (T*)temp_buffer[i];
+            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_ATOMIC;
+            lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                (ptr + (temp_rank / 2) * SIMD_ATOMIC, sum.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
+        }
     }
 }
 
@@ -187,7 +203,7 @@ void distribute_input_to_ranks(int idx, void* inout_buffer, uint32_t size, int t
     using namespace __ESIMD_ENS;
 
     //read the input data
-    uint32_t read_offset = idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel;
+    uint32_t read_offset = idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
     simd<T, SIMD_ATOMIC * TEMP_WORLD / 2> buffer;
 
 #pragma unroll
@@ -205,7 +221,7 @@ void distribute_input_to_ranks(int idx, void* inout_buffer, uint32_t size, int t
         for (uint32_t i = 1; i < TEMP_WORLD; i += 2)
         {
             T * ptr = (T*)temp_buffer[i];
-            ptr += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
+            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
             lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + (temp_rank / 2) * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
         }
@@ -216,7 +232,7 @@ void distribute_input_to_ranks(int idx, void* inout_buffer, uint32_t size, int t
         for (uint32_t i = 0; i < TEMP_WORLD; i += 2)
         {
             T * ptr = (T*)temp_buffer[i];
-            ptr += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
+            ptr += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD / 2 * SIMD_ATOMIC;
             lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + (temp_rank / 2) * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)));
         }
@@ -231,8 +247,8 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
 
     //read the input data
     T * ptr = (T*)temp_buffer[temp_rank];
-    int read_offset = idx * SIMD_ATOMIC * TEMP_WORLD;
-    ptr += read_offset + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD / 2; //points to second half of the temp slot since that where the data is from other ranks.
+    int read_offset = idx * SIMD_ATOMIC * TEMP_WORLD * 2;
+    ptr += read_offset + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD; //points to second half of the temp slot since that's where the data is from other ranks.
     simd<T, SIMD_ATOMIC> sum = 0;
     simd<T, SIMD_ATOMIC * TEMP_WORLD / 2> buffer;
 #pragma unroll
@@ -252,7 +268,7 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
 }
 
 template <uint32_t TEMP_WORLD, typename T>
-void gather(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
+void gather_from_remote_and_dist_to_rank_pair(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
 {
     using namespace __ESIMD_NS;
     using namespace __ESIMD_ENS;
@@ -267,7 +283,7 @@ void gather(int idx, void* inout_buffer, uint32_t size, int threads_already_proc
         {
             //read the values
             T *read_ptr_int = (T*)temp_buffer[i];
-            read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD / 2; //get the sum from the second half of temp slot
+            read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD; //get the sum from the second half of temp slot
             buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
                 (read_ptr_int);
         }
@@ -280,50 +296,48 @@ void gather(int idx, void* inout_buffer, uint32_t size, int threads_already_proc
         {
             //read the values
             T *read_ptr_int = (T*)temp_buffer[i];
-            read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD / 2; //get the sum from the second half of temp slot
+            read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + SIMD_ATOMIC * TEMP_WORLD; //get the sum from the second half of temp slot
             buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * (i / 2)) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
                 (read_ptr_int);
         }
 
     }
 
-    //write out the results
-    uint32_t write_offset = idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel;
-    simd<T, SIMD_ATOMIC * TEMP_WORLD / 2> results = buffer;
-    T * write_ptr = (T*)temp_buffer[temp_rank];
-    write_ptr += write_offset;
+    //write the data to the pair of ranks within the same gpu
+    T * ptr_even = (T*)temp_buffer[temp_rank & 0xfffffffe] + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
+    T * ptr_odd = (T*)temp_buffer[temp_rank | 1] + (temp_rank & 1) * SIMD_ATOMIC * TEMP_WORLD / 2;
+    ptr_even += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
+    ptr_odd += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
+    uint32_t i;
 #pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
+    for (i = 0; i < TEMP_WORLD / 2; i++)
     {
         lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-            (write_ptr + i * SIMD_ATOMIC, results.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));//save the results in the first half of temp slot
+            (ptr_even + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));//save the results in the first half of temp slot
+    }
+#pragma unroll
+    for (i = 0; i < TEMP_WORLD / 2; i++)
+    {
+        lsc_block_store<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            (ptr_odd + i * SIMD_ATOMIC, buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i));//save the results in the first half of temp slot
     }
 }
 
 template <uint32_t TEMP_WORLD, typename T>
-void gather_and_output(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
+void write_output(int idx, void* inout_buffer, uint32_t size, int threads_already_processed, void *temp_buffer[], uint32_t temp_rank, int outer_iter, int size_per_buffer_kernel, int buffer_index_kernel)
 {
     using namespace __ESIMD_NS;
     using namespace __ESIMD_ENS;
 
     //read the input data
     simd<T, SIMD_ATOMIC * TEMP_WORLD> buffer;
-    T *read_ptr_int = (T*)temp_buffer[temp_rank & 0xfffffffe];//read even rank first since it has the first 4 values
-    read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel;
+    T *read_ptr_int = (T*)temp_buffer[temp_rank];
+    read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel;
 #pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
+    for (uint32_t i = 0; i < TEMP_WORLD; i++)
     {
         //read the values
         buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-            (read_ptr_int + i * SIMD_ATOMIC);
-    }
-    read_ptr_int = (T*)temp_buffer[temp_rank | 1];//read the odd rank next since it has the second 4 values
-    read_ptr_int += idx * SIMD_ATOMIC * TEMP_WORLD + size_per_buffer_kernel * buffer_index_kernel;
-#pragma unroll
-    for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
-    {
-        //read the values
-        buffer.template select<SIMD_ATOMIC, 1>(SIMD_ATOMIC * i + SIMD_ATOMIC * TEMP_WORLD / 2) = lsc_block_load<T, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
             (read_ptr_int + i * SIMD_ATOMIC);
     }
 
@@ -446,7 +460,7 @@ public:
         int size_per_buffer_kernel = size_per_buffer / sizeof(data_type);
         int size_per_buffer_for_sync_kernel = size_per_buffer_kernel / (sizeof(int) / sizeof(data_type));
         int buffer_index_kernel = buffer_index;
-        int outerloop_iter_count = (size + MAX_COUNT - 1) / MAX_COUNT;
+        int outerloop_iter_count = (size + (MAX_COUNT/2) - 1) / (MAX_COUNT/2); //Since 16 elements in temp buffer is used to process 8 element output, the outer loop count must be doubled roughly.
         printf("outerloop_iter_count=%d\n", outerloop_iter_count);
         int outer_iter;
         //todo:
@@ -474,13 +488,13 @@ public:
                 for (int i = 0; i < KERNEL_NUM; i++)
                     executed[i] = false;
                 uint32_t total_threads_needed;
-                if (size - outer_iter * MAX_COUNT > MAX_COUNT)
+                if (size - outer_iter * (MAX_COUNT/2) > (MAX_COUNT/2))
                 {
-                    total_threads_needed = (MAX_COUNT + SIMD_ATOMIC * temp_world - 1) / (SIMD_ATOMIC * temp_world);
+                    total_threads_needed = ((MAX_COUNT/2) + SIMD_ATOMIC * temp_world - 1) / (SIMD_ATOMIC * temp_world);
                 }
                 else
                 {
-                    total_threads_needed = (size - outer_iter * MAX_COUNT + SIMD_ATOMIC * temp_world - 1) / (SIMD_ATOMIC * temp_world);
+                    total_threads_needed = (size - outer_iter * (MAX_COUNT/2) + SIMD_ATOMIC * temp_world - 1) / (SIMD_ATOMIC * temp_world);
                 }
                 int wg_size = 1;
 
@@ -490,14 +504,14 @@ public:
                 if (persist_threads_needed > HW_THREAD_COUNT)
                     persist_threads_needed = HW_THREAD_COUNT;
 
-#define KERNEL_EXEC_MAP (1+2+4+8+16+32+64+128+256+512+1024) //0x3f
+#define KERNEL_EXEC_MAP (1+2+4+8+16+32+64+128+256) 
 
 #if KERNEL_EXEC_MAP & 1
                 //Data is sent to other tile within the same gpu via MDFI
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
-                    cgh.parallel_for<class Kernel_distribute_inputs_to_local_rank>(
+                    cgh.parallel_for<class Kernel_load_input_to_temp_buffer>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
                         {
 
@@ -513,28 +527,28 @@ public:
                                 switch (temp_world)
                                 {
                                 case 1:
-                                    distribute_input_to_local_rank<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 2:
-                                    distribute_input_to_local_rank<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 3:
-                                    distribute_input_to_local_rank<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 4:
-                                    distribute_input_to_local_rank<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 5:
-                                    distribute_input_to_local_rank<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 6:
-                                    distribute_input_to_local_rank<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 7:
-                                    distribute_input_to_local_rank<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 8:
-                                    distribute_input_to_local_rank<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    load_input_to_temp_buffer<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;
@@ -551,7 +565,7 @@ public:
                 //printf("kernel0\n");
 #endif
 #if KERNEL_EXEC_MAP & 2
-                //sync all the ranks within the GPU.
+                //sync all the ranks within the single GPU.
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
@@ -603,7 +617,7 @@ public:
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
-                    cgh.parallel_for<class Kernel_local_summation>(
+                    cgh.parallel_for<class Kernel_local_sum_and_distribute_to_remote_ranks>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
                         {
 
@@ -619,28 +633,28 @@ public:
                                 switch (temp_world)
                                 {
                                 case 1:
-                                    local_sum<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 2:
-                                    local_sum<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 3:
-                                    local_sum<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 4:
-                                    local_sum<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 5:
-                                    local_sum<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 6:
-                                    local_sum<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 7:
-                                    local_sum<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 8:
-                                    local_sum<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    local_sum_and_distribute_to_remote_ranks<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;
@@ -709,120 +723,11 @@ public:
                 //printf("kernel3\n");
 #endif
 #if KERNEL_EXEC_MAP & 16
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
-                {
-                    cgh.parallel_for<class Kernel_distribute_inputs_to_ranks>(
-                        sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
-                        {
-
-                            /////////////////////////////////////////////////////////////////////////////////
-                            //ESIMD kernel
-                            //move the local sum to other ranks
-                            for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
-                            {
-                                int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
-                                    break;
-
-                                switch (temp_world)
-                                {
-                                case 1:
-                                    distribute_input_to_ranks<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 2:
-                                    distribute_input_to_ranks<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 3:
-                                    distribute_input_to_ranks<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 4:
-                                    distribute_input_to_ranks<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 5:
-                                    distribute_input_to_ranks<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 6:
-                                    distribute_input_to_ranks<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 7:
-                                    distribute_input_to_ranks<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                case 8:
-                                    distribute_input_to_ranks<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
-                                    break;
-                                default:
-                                    break;
-                                }
-                            }
-
-                        });//parallel_for
-                });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
-                //printf("kernel4\n");
-#endif
-#if KERNEL_EXEC_MAP & 32
-                //sync all the ranks here before consuming the results.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
-                {
-                    cgh.parallel_for<class Kernel_rankSync3>(
-                        sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
-                        {
-                            /////////////////////////////////////////////////////////////////////////////////
-                            //ESIMD kernel
-                            simd<ushort, SIMD_ATOMIC> ramp;
-#pragma unroll
-                            for (uint32_t i = 0; i < SIMD_ATOMIC; i++)
-                            {
-                                ramp[i] = i * sizeof(int);
-                            }
-
-                            //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
-                            simd_mask<SIMD_ATOMIC> pred;
-                            simd<int, SIMD_ATOMIC> status0;
-                            pred = false;
-                            pred[2] = true;
-
-                            //sync .
-                            for (uint32_t i = 0; i < temp_world; i++)
-                            {
-                                int * sync_ptr = (int*)temp_sync_buffer[i] + size_per_buffer_for_sync_kernel * buffer_index_kernel;
-                                ////never true. Used to force dependecy with prev kernel
-                                //if (total_threads_needed_sync == 0x7fffffff)
-                                //    sync_ptr = temp_buffer[0];
-                                lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (sync_ptr, ramp, pred);
-                            }
-
-                            //wait for all the local TG to sync. Then sync the other remote GPUs
-                            int * sync_ptr = (int*)temp_sync_buffer[temp_rank] + size_per_buffer_for_sync_kernel * buffer_index_kernel;
-                            status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (sync_ptr, ramp, pred);
-                            while (status0[2] != temp_world)
-                            {
-                                status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (sync_ptr, ramp, pred);
-                            }
-                        });//parallel_for
-                });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
-                //printf("kernel5\n");
-#endif
-#if KERNEL_EXEC_MAP & 64
                 //local reduction kernel
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
-                    cgh.parallel_for<class Kernel_all_summation>(
+                    cgh.parallel_for<class Kernel_all_sum>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
                         {
 
@@ -875,7 +780,7 @@ public:
                 kernel_index++;
                 //printf("kernel6\n");
 #endif
-#if KERNEL_EXEC_MAP & 128
+#if KERNEL_EXEC_MAP & 32
                 //sync all the ranks here before consuming the results.
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
@@ -927,12 +832,12 @@ public:
                 kernel_index++;
                 //printf("kernel7\n");
 #endif
-#if KERNEL_EXEC_MAP & 256
+#if KERNEL_EXEC_MAP & 64
                 //copy the results to all the ranks.
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
-                    cgh.parallel_for<class Kernel_gather>(
+                    cgh.parallel_for<class Kernel_gather_from_remote_and_dist_to_rank_pair>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
                         {
                             /////////////////////////////////////////////////////////////////////////////////
@@ -946,28 +851,28 @@ public:
                                 switch (temp_world)
                                 {
                                 case 1:
-                                    gather<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 2:
-                                    gather<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 3:
-                                    gather<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 4:
-                                    gather<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 5:
-                                    gather<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 6:
-                                    gather<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 7:
-                                    gather<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 8:
-                                    gather<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    gather_from_remote_and_dist_to_rank_pair<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;
@@ -982,8 +887,8 @@ public:
                 kernel_index++;
                 //printf("kernel8\n");
 #endif
-#if KERNEL_EXEC_MAP & 512
-                //sync all the ranks within the GPU.
+#if KERNEL_EXEC_MAP & 128
+                //sync all the ranks within the same GPU.
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
@@ -1035,12 +940,12 @@ public:
                 kernel_index++;
                 //printf("kernel9\n");
 #endif
-#if KERNEL_EXEC_MAP & 1024
+#if KERNEL_EXEC_MAP & 256
                 //copy the results to all the ranks.
                 executed[kernel_index] = true;
                 e[kernel_index] = queue.submit([&](sycl::handler& cgh)
                 {
-                    cgh.parallel_for<class Kernel_gather_and_output>(
+                    cgh.parallel_for<class Kernel_write_output>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
                         {
                             /////////////////////////////////////////////////////////////////////////////////
@@ -1054,28 +959,28 @@ public:
                                 switch (temp_world)
                                 {
                                 case 1:
-                                    gather_and_output<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<1, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 2:
-                                    gather_and_output<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<2, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 3:
-                                    gather_and_output<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<3, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 4:
-                                    gather_and_output<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<4, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 5:
-                                    gather_and_output<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<5, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 6:
-                                    gather_and_output<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<6, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 7:
-                                    gather_and_output<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<7, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 case 8:
-                                    gather_and_output<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    write_output<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;
@@ -1103,7 +1008,7 @@ public:
 
         if (print_en)
         {
-            //sleep(temp_rank);
+            sleep(temp_rank);
             for (r = 1; r < repetition; r++)
             {
                 std::cout << "rank" << temp_rank << " rep_idx" << r << " host us= " << ctimer.get_us(r) << "\n";
