@@ -1103,7 +1103,7 @@ public:
 
         if (print_en)
         {
-            //sleep(temp_rank);
+            sleep(temp_rank);
             for (r = 1; r < repetition; r++)
             {
                 std::cout << "rank" << temp_rank << " rep_idx" << r << " host us= " << ctimer.get_us(r) << "\n";
