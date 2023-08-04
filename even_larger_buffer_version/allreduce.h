@@ -21,7 +21,7 @@
 #define BUFFER_COUNT 2
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
-#define MAX_COUNT (64*1024*1024/sizeof(data_type))
+#define MAX_COUNT (128*1024*1024/sizeof(data_type))
 #define EU_COUNT_PER_RANK 512
 #define THREAD_COUNT_PER_EU 8
 #define HW_THREAD_COUNT (EU_COUNT_PER_RANK * THREAD_COUNT_PER_EU)
@@ -421,8 +421,6 @@ public:
         printf("outerloop_iter_count=%d\n", outerloop_iter_count);
         int outer_iter;
         //todo:
-        //3. cache control fine tune
-        //4, tune the temp buffer size so that there are whole number of waves instead of fractional waves.
         //5. prefetch in persistent threads?
         sycl::event e[KERNEL_NUM];
         bool executed[KERNEL_NUM];
