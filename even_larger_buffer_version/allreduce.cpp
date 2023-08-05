@@ -22,6 +22,37 @@ void *mmap_host(size_t map_size, int dma_buf_fd) {
   return mmap(nullptr, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, dma_buf_fd, 0);
 }
 
+void *mmap_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  alignas(64) exchange_contents send_buf;
+
+  // fill in the exchange info
+  zeCheck(zeMemGetIpcHandle(l0_ctx, base_addr, &send_buf.ipc_handle));
+  auto* host_ptr = mmap_host(base_size, send_buf.fd);
+  return (char *) host_ptr + ((char *)ptr - (char *)base_addr);
+}
+
+void *copy_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  auto * host_ptr = sycl::malloc_host(base_size, queue);
+  queue.memcpy(host_ptr, ptr, base_size);
+  queue.wait();
+
+  return host_ptr;
+}
+
 template <typename T>
 bool checkResults(T *ptr, size_t count, int rank, bool check_output, int repetition, int world) {
     bool returnval = true;
@@ -56,6 +87,7 @@ bool checkResults(T *ptr, size_t count, int rank, bool check_output, int repetit
 
     if (check_output)
     {
+#pragma omp parallel for
         for (int i = 0; i < count; ++i) {
             T in[MAX_RANK];
             //create the input values
@@ -83,7 +115,6 @@ bool checkResults(T *ptr, size_t count, int rank, bool check_output, int repetit
             {
                 printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
                 returnval = false;
-                return returnval;
             }
             //else
             //    printf("matched %f at index %d\n", (double)sum, i);
@@ -144,7 +175,7 @@ int main(int argc, char* argv[]) {
   allreducer<sycl::half> ar;
   ar.init(queue, rank, world);
   // temporal buffer used for allreduce temporal use only.
-  void* buffer = sycl::malloc_shared(alloc_size, queue);
+  void* buffer = sycl::malloc_device(alloc_size, queue);
   using namespace __ESIMD_NS;
   using namespace __ESIMD_ENS;
   uint32_t total_threads_needed = (count + SIMD_INIT - 1) / (SIMD_INIT);
@@ -206,7 +237,8 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 
-  check = checkResults((sycl::half *)buffer, count, rank, true, repetition, world);
+  auto *host_buffer = copy_device_to_host(buffer, queue);
+  check = checkResults((sycl::half *)host_buffer, count, rank, true, repetition, world);
   
   if (check)
     std::cout<< "rank" << rank << ": Successfully fill remote buffer"<<std::endl;
@@ -216,4 +248,5 @@ int main(int argc, char* argv[]) {
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
   sycl::free(buffer, queue);
+  sycl::free(host_buffer, queue);
 }
