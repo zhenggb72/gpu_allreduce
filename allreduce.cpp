@@ -22,13 +22,45 @@ void *mmap_host(size_t map_size, int dma_buf_fd) {
   return mmap(nullptr, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, dma_buf_fd, 0);
 }
 
+void *mmap_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  alignas(64) exchange_contents send_buf;
+
+  // fill in the exchange info
+  zeCheck(zeMemGetIpcHandle(l0_ctx, base_addr, &send_buf.ipc_handle));
+  auto* host_ptr = mmap_host(base_size, send_buf.fd);
+  return (char *) host_ptr + ((char *)ptr - (char *)base_addr);
+}
+
+void *copy_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  auto * host_ptr = sycl::malloc_host(base_size, queue);
+  queue.memcpy(host_ptr, ptr, base_size);
+  queue.wait();
+
+  return host_ptr;
+}
+
 template <typename T>
-bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int iter) {
+bool checkResults(T *ptr, size_t count, int rank, bool check_output, int repetition, int world) {
     bool returnval = true;
 
-#if DEBUG_DUMP_TO_DEDICATED_OFFSET
+#if 1
     //print debug info
     //sleep(rank*0.001);
+    /*
     for (int i = count/ (sizeof(int) / sizeof(sycl::half)); i < count/(sizeof(int)/sizeof(sycl::half)) + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT; ++i) {
         int thread_idx = (i - count / (sizeof(int) / sizeof(sycl::half))) / DEBUG_DATA_SIZE;
         //if ((i - count / (sizeof(int) / sizeof(sycl::half))) % DEBUG_DATA_SIZE == 0)
@@ -51,43 +83,44 @@ bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int it
             }
         }
     }
+    */
 
     if (check_output)
     {
+#pragma omp parallel for
         for (int i = 0; i < count; ++i) {
-            if (ptr[i] != c)
+            T in[MAX_RANK];
+            //create the input values
+            for (int r = 0; r < world; ++r)
             {
-                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
-                returnval = false;
-                return returnval;
+                in[r] = (r + ((i / SIMD_INIT) & 0x3ff) + (i & 0x3f)) * 1.0 / 1024;
             }
+            //compute the reference result.
+            T sum;
+            for (int rep = 0; rep < repetition; ++rep)
+            {
+                sum = 0;
+                for (int r = 0; r < world; r+=2)
+                {
+                    sum += (T)(in[r] + in[r+1]);
+                }
+                for (int r = 0; r < world; ++r)
+                {
+                    in[r] = sum;
+                }
+            }
+
+            //check the kernel result against the reference result
+            if (ptr[i] != (T)sum)
+            {
+                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
+                returnval = false;
+            }
+            //else
+            //    printf("matched %f at index %d\n", (double)sum, i);
         }
     }
 #else
-    //print debug info
-    //sleep(rank*0.001);
-    //printf("\nthread0\n");
-    for (int i = 0; i < 2; ++i) {
-        printf("%d, ", ((int *)ptr)[i]);
-    }
-    //printf("\nthread1\n");
-    for (int i = SIMD * UNROLL_SIZE / (sizeof(int) / sizeof(sycl::half)); i < SIMD * UNROLL_SIZE / (sizeof(int) / sizeof(sycl::half)) + 2; ++i) {
-        printf("%d, ", ((int *)ptr)[i]);
-        if (((int *)ptr)[i] >= LOOP_COUNT_LIMIT)
-        {
-            printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPOTENTIAL HANG\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-        }
-
-    }
-
-    for (int i = SIMD * UNROLL_SIZE * 2; i < count; ++i) {
-        if (ptr[i] != c)
-        {
-            printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
-            returnval = false;
-            return returnval;
-        }
-    }
 #endif
     return returnval;
 }
@@ -109,8 +142,7 @@ int main(int argc, char* argv[]) {
   auto dtype = parsed_opts["type"].as<std::string>();
 
   size_t alloc_size = 0;
-
-  alloc_size = count * sizeof(sycl::half);
+  alloc_size = (count + SIMD_COMPUTE * MAX_RANK - 1) / (SIMD_COMPUTE * MAX_RANK) * SIMD_COMPUTE * MAX_RANK * sizeof(sycl::half); //force the input buffer to be 4KB aligned so that there is no page fault when accessing beyond buffer boundary
 
   // init section
   auto ret = MPI_Init(&argc, &argv);
@@ -124,8 +156,16 @@ int main(int argc, char* argv[]) {
 
   MPI_Comm_size(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  //only power of 2 number of ranks are supported.
+  if ((world & (world - 1)) != 0)
+  {
+      printf("error: world size of %d is not supported.\n", world);
+      exit(-1);
+  }
   
-  printf("buffer size=%d\n", (int)(alloc_size * world));
+  printf("---------------------------------------------------------------------\n");
+  printf("buffer size=%d\n", (int)(count * sizeof(sycl::half)));
 
   // rank 0, device 0, subdevice 0
   // rank 1, device 0, subdevice 1
@@ -133,28 +173,28 @@ int main(int argc, char* argv[]) {
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
   allreducer<sycl::half> ar;
-  //printf("DEBUG rank%d: init\n", rank);
   ar.init(queue, rank, world);
-  //printf("DEBUG rank%d: malloc_shared\n", rank);
   // temporal buffer used for allreduce temporal use only.
-  void* buffer = sycl::malloc_shared(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
+  void* buffer = sycl::malloc_device(alloc_size, queue);
   using namespace __ESIMD_NS;
   using namespace __ESIMD_ENS;
-  uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
+  uint32_t total_threads_needed = (count + SIMD_INIT - 1) / (SIMD_INIT);
   int wg_size = 1;
   sycl::event e;
-  //printf("DEBUG rank%d: input_init_kernel\n", rank);
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel1>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
-            simd<sycl::half, SIMD> grf; //4 registers allocated.
-            uint32_t index = idx * SIMD;
+            simd<sycl::half, SIMD_INIT> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD_INIT;
 
             // init buffer
-            grf = rank;
+            simd<int, SIMD_INIT> ramp;
+            for (int i = 0; i < SIMD_INIT; i++)
+                ramp[i] = i;
+            grf = (rank + (idx & 0x3ff) + ramp) * 1.0 / 1024;
             sycl::half * ptr = (sycl::half*)buffer;
-            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
             lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
           });
@@ -164,57 +204,42 @@ int main(int argc, char* argv[]) {
   int repetition = 4;
   bool check = false;
 
-  sycl::half sum;
-  if (repetition == 1)
-  {
-      sum = world * (world - 1) / 2;
-  }
-  else
-  {
-      sum = world * (world - 1) / 2;
-      for (int i = 0; i < repetition - 1; i++)
-      {
-          sum = (int)world * (int)sum;
-      }
-  }
-
-  printf("DEBUG rank%d: allreduce\n", rank);
-  
   //warm up runs
-  ar.allreduce(queue, buffer, count, 3, false);
+  ar.allreduce(queue, buffer, count, repetition);
+  std::cout << "rank" << rank << " warmup done " << "\n";
   //reinit the input buffer content
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel2>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
-            simd<sycl::half, SIMD> grf; //4 registers allocated.
-            uint32_t index = idx * SIMD;
+            simd<sycl::half, SIMD_INIT> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD_INIT;
 
             // init buffer
-            grf = rank;
+            simd<int, SIMD_INIT> ramp;
+            for (int i = 0; i < SIMD_INIT; i++)
+                ramp[i] = i;
+            grf = (rank + (idx & 0x3ff) + ramp) * 1.0 / 1024;
             sycl::half * ptr = (sycl::half*)buffer;
-            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
             lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
           });
   });
   e.wait();
-
-
   //real runs
-  ar.allreduce(queue, buffer, count, repetition, true);
+  float total_kernel_time = ar.allreduce(queue, buffer, count, repetition);
+  sleep(rank);
+  std::cout << "rank" << rank;
+  std::cout << "\t total kernel us= " << total_kernel_time << "\n";
 
   // avoid race condition
   queue.wait();
-  //printf("DEBUG rank%d: MPI_Barrier\n", rank);
   MPI_Barrier(MPI_COMM_WORLD);
-  //printf("DEBUG rank%d: MPI_Finalize\n", rank);
   MPI_Finalize();
 
-  //printf("DEBUG rank%d: check result\n", rank);
-  check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, true, -1);
-  //std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
-    
+  auto *host_buffer = copy_device_to_host(buffer, queue);
+  check = checkResults((sycl::half *)host_buffer, count, rank, true, repetition, world);
   
   if (check)
     std::cout<< "rank" << rank << ": Successfully fill remote buffer"<<std::endl;
@@ -224,4 +249,5 @@ int main(int argc, char* argv[]) {
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
   sycl::free(buffer, queue);
+  sycl::free(host_buffer, queue);
 }
