@@ -424,10 +424,10 @@ public:
         int buffer_index_kernel_for_sync = buffer_index;
         int outer_iter;
         //todo:
-        //1. shuffle the kernel# executions so that resource utilization can be smoothed out.
-        //2. increase the simd size there are less number of innerloop iterations. This mgiht be useful in reducing hte load stalls since the number of loads-consume pair is less.
+        //1. shuffle the kernel# executions so that resource utilization can be smoothed out. DONE
+        //2. increase the simd size there are less number of innerloop iterations. This mgiht be useful in reducing hte load stalls since the number of loads-consume pair is less. DONE
         //3. reduce gpu-cpu sync?? DONE
-        //5. prefetch in persistent threads?
+        //5. prefetch in persistent threads? DONE
         sycl::event e[2];
         uint32_t total_threads_needed_sync = 1;
         int wg_size = 1;
