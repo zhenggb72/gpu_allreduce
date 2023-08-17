@@ -350,7 +350,7 @@ public:
         rank = rank_in;
         world = world_in;
         // temporal buffer used for allreduce temporal use only.
-        data_size_per_buffer = ((MAX_COUNT + SIMD_COMPUTE * SIMD_INIT - 1) / (SIMD_COMPUTE * SIMD_INIT)) * SIMD_COMPUTE * SIMD_INIT;
+        data_size_per_buffer = ((MAX_COUNT + SIMD_COMPUTE * max_rank + SIMD_COMPUTE * SIMD_INIT - 1) / (SIMD_COMPUTE * SIMD_INIT)) * SIMD_COMPUTE * SIMD_INIT;
         size_per_buffer = data_size_per_buffer * sizeof(data_type) + (SYNC_BYTE + SIMD_COMPUTE * SIMD_INIT * sizeof(data_type) - 1) / (SIMD_COMPUTE * SIMD_INIT * sizeof(data_type)) * SIMD_COMPUTE * SIMD_INIT * sizeof(data_type);
         void* local_buffer = sycl::malloc_shared(size_per_buffer * BUFFER_COUNT, queue);
         int data_size_per_buffer_kernel = data_size_per_buffer;
@@ -441,10 +441,12 @@ public:
 
         int outerloop_iter_count;
         int sync_reset_counter = 0;
+        int max_threads_per_MAX_COUNT = (MAX_COUNT / 2) / (SIMD_COMPUTE * temp_world);
+        int max_elements_per_MAX_COUNT = max_threads_per_MAX_COUNT * (SIMD_COMPUTE * temp_world);
         for (r = 0; r < repetition; r++)
         {
             total_kernel_time = 0;
-            outerloop_iter_count = size / (MAX_COUNT / 2); //this is the outerloop count that requires full hw thread count. This doesnt include the outloop iteration that only needs partial thread count
+            outerloop_iter_count = size / max_elements_per_MAX_COUNT; //this is the outerloop count that requires full hw thread count. This doesnt include the outloop iteration that only needs partial thread count
 
             //init the sw pipeline
             int sw_pipeline_insert_index = 0;
@@ -484,11 +486,11 @@ public:
                 if (iter == 1) //if second iteration, then handle the partial usage of the temp buffer
                 {
                     //if there is little more left to compute, then finish them
-                    if (outerloop_iter_count * (MAX_COUNT / 2) < size)
+                    if (outerloop_iter_count * max_elements_per_MAX_COUNT < size)
                     {
                         start = outerloop_iter_count;
                         end = start + 1;
-                        total_threads_needed = (size - start * (MAX_COUNT / 2) + SIMD_COMPUTE * temp_world - 1) / (SIMD_COMPUTE * temp_world);
+                        total_threads_needed = (size - start * max_elements_per_MAX_COUNT + SIMD_COMPUTE * temp_world - 1) / (SIMD_COMPUTE * temp_world);
                     }
                     else
                     {
@@ -499,7 +501,7 @@ public:
                 {
                     start = 0;
                     end = outerloop_iter_count;
-                    total_threads_needed = ((MAX_COUNT / 2) + SIMD_COMPUTE * temp_world - 1) / (SIMD_COMPUTE * temp_world);
+                    total_threads_needed = max_threads_per_MAX_COUNT;
 
                     if (end == 0)
                         continue; //there is nothing to do when end is 0 so check the next iter.

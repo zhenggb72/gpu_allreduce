@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   //only power of 2 number of ranks are supported.
-  if ((world & (world - 1)) != 0)
+  if ((world & 1) != 0)
   {
       printf("error: world size of %d is not supported.\n", world);
       exit(-1);
