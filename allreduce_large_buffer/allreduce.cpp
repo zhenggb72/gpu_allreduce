@@ -10,7 +10,8 @@
 #include "cxxopts.hpp"
 #include "ze_exception.hpp"
 #include "allreduce.h"
-
+#include <chrono>
+#include <thread>
 
 static size_t align_up(size_t size, size_t align_sz) {
     return ((size + align_sz -1) / align_sz) * align_sz;
@@ -229,7 +230,8 @@ int main(int argc, char* argv[]) {
   e.wait();
   //real runs
   float total_kernel_time = ar.allreduce(queue, buffer, count, repetition);
-  sleep(rank);
+  //sleep(rank);
+  std::this_thread::sleep_for(std::chrono::milliseconds(rank * 100));
   std::cout << "rank" << rank;
   std::cout << "\t total kernel us= " << total_kernel_time << "\n";
 

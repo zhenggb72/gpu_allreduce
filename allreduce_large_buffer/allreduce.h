@@ -375,11 +375,17 @@ public:
                   grf = 0;
                   data_type * ptr = (data_type*)local_buffer + index;
                   data_type * ptr2 = (data_type*)local_buffer + index + size_per_buffer_kernel;
+                  data_type * ptr3 = (data_type*)local_buffer + index + size_per_buffer_kernel * 2;
+                  data_type * ptr4 = (data_type*)local_buffer + index + size_per_buffer_kernel * 3;
                   //init the sync buffer in two sub-buffers instead of all 5 buffers. Only two are used by sync kernels.
                   lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                       (ptr, grf);
                   lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                       (ptr2, grf);
+                  lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                      (ptr3, grf);
+                  lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                      (ptr4, grf);
                   lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
 
                 });
@@ -557,26 +563,14 @@ public:
 
                                             switch (temp_world)
                                             {
-                                            case 1:
-                                                load_input_to_temp_buffer<1, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 2:
                                                 load_input_to_temp_buffer<2, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 3:
-                                                load_input_to_temp_buffer<3, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 4:
                                                 load_input_to_temp_buffer<4, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
-                                            case 5:
-                                                load_input_to_temp_buffer<5, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 6:
                                                 load_input_to_temp_buffer<6, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 7:
-                                                load_input_to_temp_buffer<7, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 8:
                                                 load_input_to_temp_buffer<8, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
@@ -596,26 +590,14 @@ public:
 
                                             switch (temp_world)
                                             {
-                                            case 1:
-                                                local_sum_and_distribute_to_remote_ranks<1, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 2:
                                                 local_sum_and_distribute_to_remote_ranks<2, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 3:
-                                                local_sum_and_distribute_to_remote_ranks<3, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 4:
                                                 local_sum_and_distribute_to_remote_ranks<4, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
-                                            case 5:
-                                                local_sum_and_distribute_to_remote_ranks<5, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 6:
                                                 local_sum_and_distribute_to_remote_ranks<6, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 7:
-                                                local_sum_and_distribute_to_remote_ranks<7, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 8:
                                                 local_sum_and_distribute_to_remote_ranks<8, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
@@ -635,26 +617,14 @@ public:
 
                                             switch (temp_world)
                                             {
-                                            case 1:
-                                                all_sum<1, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 2:
                                                 all_sum<2, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 3:
-                                                all_sum<3, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 4:
                                                 all_sum<4, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
-                                            case 5:
-                                                all_sum<5, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 6:
                                                 all_sum<6, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 7:
-                                                all_sum<7, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 8:
                                                 all_sum<8, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
@@ -674,26 +644,14 @@ public:
 
                                             switch (temp_world)
                                             {
-                                            case 1:
-                                                gather_from_remote_and_dist_to_rank_pair<1, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 2:
                                                 gather_from_remote_and_dist_to_rank_pair<2, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 3:
-                                                gather_from_remote_and_dist_to_rank_pair<3, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 4:
                                                 gather_from_remote_and_dist_to_rank_pair<4, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
-                                            case 5:
-                                                gather_from_remote_and_dist_to_rank_pair<5, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 6:
                                                 gather_from_remote_and_dist_to_rank_pair<6, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 7:
-                                                gather_from_remote_and_dist_to_rank_pair<7, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 8:
                                                 gather_from_remote_and_dist_to_rank_pair<8, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
@@ -713,26 +671,14 @@ public:
 
                                             switch (temp_world)
                                             {
-                                            case 1:
-                                                write_output<1, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 2:
                                                 write_output<2, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 3:
-                                                write_output<3, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 4:
                                                 write_output<4, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
-                                            case 5:
-                                                write_output<5, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
                                             case 6:
                                                 write_output<6, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
-                                                break;
-                                            case 7:
-                                                write_output<7, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
                                                 break;
                                             case 8:
                                                 write_output<8, data_type>(index, inout_buffer, size, threads_already_processed[ii], (void **)temp_buffer, temp_rank, size_per_buffer_kernel, ii);
@@ -823,12 +769,12 @@ public:
                     //std::cout << "rank" << temp_rank << " iter" << iter << " outer_iter" << outer_iter << " kernel1 done." << "\n";
 
                     buffer_index_kernel_for_sync++;
-                    buffer_index_kernel_for_sync &= 1;
+                    buffer_index_kernel_for_sync &= 3;
                 }//for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
             }//for (int iter = 0; iter < 2; iter++)
         } // for (r = 0; r < repetition; r++)
         buffer_index += sync_reset_counter;
-        buffer_index &= 1;
+        buffer_index &= 3;
 
         return total_kernel_time;
     }
