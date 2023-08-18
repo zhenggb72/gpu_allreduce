@@ -14,9 +14,6 @@ make
 #mpirun -np 8 ./allreduce -c 67108855 -t float
 #mpirun -np 8 ./allreduce -c 1 -t float
 #mpirun -np 8 ./allreduce -c 257 -t float
-#mpirun -np 8 ./allreduce -c 134211111 -t float
-#mpirun -np 8 ./allreduce -c 8 -t float
-mpirun -np 8 ./allreduce -c 134217111 -t float
 
 #mpirun -np 8 ./allreduce -c 8 -t float
 #mpirun -np 8 ./allreduce -c 16 -t float
@@ -42,7 +39,7 @@ mpirun -np 8 ./allreduce -c 134217111 -t float
 #mpirun -np 8 ./allreduce -c 16777216 -t float
 #mpirun -np 8 ./allreduce -c 33554432 -t float
 #mpirun -np 8 ./allreduce -c 67108864 -t float
-#mpirun -np 8 ./allreduce -c 134217728 -t float
+mpirun -np 8 ./allreduce -c 134217728 -t float
 #mpirun -np 8 ./allreduce -c 268435456 -t float
 #mpirun -np 8 ./allreduce -c 536870912 -t float
 #mpirun -np 8 ./allreduce -c 1073741824 -t float

@@ -9,9 +9,8 @@
 
 #include "cxxopts.hpp"
 #include "ze_exception.hpp"
-#include "allreduce.h" 
-#include <chrono>
-#include <thread>
+#include "allreduce.h"
+
 
 static size_t align_up(size_t size, size_t align_sz) {
     return ((size + align_sz -1) / align_sz) * align_sz;
@@ -143,7 +142,7 @@ int main(int argc, char* argv[]) {
   auto dtype = parsed_opts["type"].as<std::string>();
 
   size_t alloc_size = 0;
-  alloc_size = (count + SIMD_COMPUTE * MAX_RANK - 1) / (SIMD_COMPUTE * MAX_RANK) * SIMD_COMPUTE * MAX_RANK * sizeof(sycl::half); //force the input buffer to be 4KB aligned so that there is no page fault when accessing beyond buffer boundary
+  alloc_size = (count + SIMD_ATOMIC * MAX_RANK - 1) / (SIMD_ATOMIC * MAX_RANK) * SIMD_ATOMIC * MAX_RANK * sizeof(sycl::half); //force the input buffer to be 4KB aligned so that there is no page fault when accessing beyond buffer boundary
 
   // init section
   auto ret = MPI_Init(&argc, &argv);
@@ -159,7 +158,7 @@ int main(int argc, char* argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   //only power of 2 number of ranks are supported.
-  if ((world & 1) != 0)
+  if ((world & (world - 1)) != 0)
   {
       printf("error: world size of %d is not supported.\n", world);
       exit(-1);
@@ -206,9 +205,8 @@ int main(int argc, char* argv[]) {
   bool check = false;
 
   //warm up runs
-  float cpu_time = 0.0;
-  ar.allreduce(queue, buffer, count, repetition, &cpu_time);
-  std::cout << "rank" << rank << " warmup done " << "\n";
+  bool print_en = false;
+  ar.allreduce(queue, buffer, count, repetition, print_en);
   //reinit the input buffer content
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel2>(
@@ -229,14 +227,10 @@ int main(int argc, char* argv[]) {
           });
   });
   e.wait();
+
   //real runs
-  cpu_time = 0.0;
-  float total_kernel_time = ar.allreduce(queue, buffer, count, repetition, &cpu_time);
-  //sleep(rank);
-  std::this_thread::sleep_for(std::chrono::milliseconds(rank * 100));
-  std::cout << "rank" << rank;
-  std::cout << "\t total kernel us= " << total_kernel_time;
-  std::cout << "\t total cpu us= " << cpu_time << "\n";
+  print_en = true;
+  ar.allreduce(queue, buffer, count, repetition, print_en);
 
   // avoid race condition
   queue.wait();
