@@ -398,13 +398,14 @@ public:
         initialized = true;
 
     }
-    float allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition)
+    float allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, float *cpu_time)
     {
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
 
         float total_kernel_time ;
         gpu_timer<KERNEL_NUM> gtimer;
+        cpu_timer<MAX_REPETITION + 1> ctimer;
 
         if (repetition > MAX_REPETITION)
         {
@@ -445,6 +446,10 @@ public:
         int max_elements_per_MAX_COUNT = max_threads_per_MAX_COUNT * (SIMD_COMPUTE * temp_world);
         for (r = 0; r < repetition; r++)
         {
+            ctimer.start(r);
+            if (r == 1)
+                ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
+
             total_kernel_time = 0;
             outerloop_iter_count = size / max_elements_per_MAX_COUNT; //this is the outerloop count that requires full hw thread count. This doesnt include the outloop iteration that only needs partial thread count
 
@@ -774,10 +779,13 @@ public:
                     buffer_index_kernel_for_sync &= 3;
                 }//for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
             }//for (int iter = 0; iter < 2; iter++)
+            ctimer.stop(r);
         } // for (r = 0; r < repetition; r++)
         buffer_index += sync_reset_counter;
         buffer_index &= 3;
+        ctimer.stop(MAX_REPETITION);
 
+        *cpu_time = ctimer.get_us(MAX_REPETITION) / (repetition - 1);
         return total_kernel_time;
     }
     void release(sycl::queue& queue)

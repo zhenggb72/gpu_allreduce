@@ -206,7 +206,8 @@ int main(int argc, char* argv[]) {
   bool check = false;
 
   //warm up runs
-  ar.allreduce(queue, buffer, count, repetition);
+  float cpu_time = 0.0;
+  ar.allreduce(queue, buffer, count, repetition, &cpu_time);
   std::cout << "rank" << rank << " warmup done " << "\n";
   //reinit the input buffer content
   e = queue.submit([&](sycl::handler& cgh) {
@@ -229,11 +230,13 @@ int main(int argc, char* argv[]) {
   });
   e.wait();
   //real runs
-  float total_kernel_time = ar.allreduce(queue, buffer, count, repetition);
+  cpu_time = 0.0;
+  float total_kernel_time = ar.allreduce(queue, buffer, count, repetition, &cpu_time);
   //sleep(rank);
   std::this_thread::sleep_for(std::chrono::milliseconds(rank * 100));
   std::cout << "rank" << rank;
-  std::cout << "\t total kernel us= " << total_kernel_time << "\n";
+  std::cout << "\t total kernel us= " << total_kernel_time;
+  std::cout << "\t total cpu us= " << cpu_time << "\n";
 
   // avoid race condition
   queue.wait();
