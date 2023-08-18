@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <system_error>
 
-#include <mpi.h>
+#include <mpi.h> 
 #include <sycl/sycl.hpp>
 #include <level_zero/ze_api.h>
 #include <ext/intel/esimd.hpp>
