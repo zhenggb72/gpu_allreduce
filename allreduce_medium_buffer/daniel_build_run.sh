@@ -35,7 +35,7 @@ make
 #mpirun -np 8 ./allreduce -c 1048576 -t float
 #mpirun -np 8 ./allreduce -c 2097152 -t float
 #mpirun -np 8 ./allreduce -c 4194304 -t float
-#mpirun -np 8 ./allreduce -c 8388608 -t float
+mpirun -np 8 ./allreduce -c 8388608 -t float
 #mpirun -np 8 ./allreduce -c 16777216 -t float
 #mpirun -np 8 ./allreduce -c 33554432 -t float
 #mpirun -np 8 ./allreduce -c 67108864 -t float
