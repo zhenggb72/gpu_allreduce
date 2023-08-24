@@ -14,10 +14,10 @@
 #include <chrono>
 #include <thread>
 
+#define MAX_RANK 16
 #define MAX_REPETITION 4
 #define INIT_SIZE 64
 #define INIT_COUNT 1
-#define MAX_RANK 8
 #define SIMD_INIT (INIT_SIZE * INIT_COUNT)
 #define SIMD_COMPUTE 128
 #define SIMD_SYNC 32
@@ -328,7 +328,7 @@ void write_output(int idx, void* inout_buffer, uint32_t size, int threads_alread
 
 }
 
-template <typename data_type, uint32_t max_rank = 8, uint32_t max_buffer = 1024 /*KB*/>
+template <typename data_type, uint32_t max_rank = MAX_RANK, uint32_t max_buffer = 1024 /*KB*/>
 class allreducer 
 {
 public:
@@ -496,6 +496,9 @@ public:
                                 case 8:
                                     load_input_to_temp_buffer<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
+                                case 16:
+                                    load_input_to_temp_buffer<16, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    break;
                                 default:
                                     break;
                                 }
@@ -589,6 +592,9 @@ public:
                                     break;
                                 case 8:
                                     local_sum_and_distribute_to_remote_ranks<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    break;
+                                case 16:
+                                    local_sum_and_distribute_to_remote_ranks<16, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;
@@ -688,6 +694,9 @@ public:
                                 case 8:
                                     all_sum<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
+                                case 16:
+                                    all_sum<16, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    break;
                                 default:
                                     break;
                                 }
@@ -784,6 +793,9 @@ public:
                                 case 8:
                                     gather_from_remote_and_dist_to_rank_pair<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
+                                case 16:
+                                    gather_from_remote_and_dist_to_rank_pair<16, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    break;
                                 default:
                                     break;
                                 }
@@ -879,6 +891,9 @@ public:
                                     break;
                                 case 8:
                                     write_output<8, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
+                                    break;
+                                case 16:
+                                    write_output<16, data_type>(index, inout_buffer, size, threads_already_processed, (void **)temp_buffer, temp_rank, outer_iter, size_per_buffer_kernel, buffer_index_kernel);
                                     break;
                                 default:
                                     break;

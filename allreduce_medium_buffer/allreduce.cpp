@@ -157,15 +157,20 @@ int main(int argc, char* argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  //only power of 2 number of ranks are supported.
+  //only 2,4,6,8,16 are supported.
   if ((world & 1) != 0)
   {
       printf("error: world size of %d is not supported.\n", world);
       exit(-1);
   }
-  
+  if (world >= 10 && world <= 14)
+  {
+      printf("error: world size of %d is not supported.\n", world);
+      exit(-1);
+  }
+
   printf("---------------------------------------------------------------------\n");
-  printf("buffer size=%d\n", (int)(count * sizeof(sycl::half)));
+  printf("buffer size=%d world=%d\n", (int)(count * sizeof(sycl::half)), world);
 
   // rank 0, device 0, subdevice 0
   // rank 1, device 0, subdevice 1

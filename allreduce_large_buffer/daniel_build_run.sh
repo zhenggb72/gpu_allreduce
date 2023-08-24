@@ -16,7 +16,7 @@ make
 #mpirun -np 8 ./allreduce -c 257 -t float
 #mpirun -np 8 ./allreduce -c 134211111 -t float
 #mpirun -np 8 ./allreduce -c 8 -t float
-mpirun -np 8 ./allreduce -c 134217111 -t float
+mpirun -np 16 ./allreduce -c 134217111 -t float
 
 #mpirun -np 8 ./allreduce -c 8 -t float
 #mpirun -np 8 ./allreduce -c 16 -t float

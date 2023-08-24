@@ -29,28 +29,28 @@ bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int it
 #if DEBUG_DUMP_TO_DEDICATED_OFFSET
     //print debug info
     //sleep(rank*0.001);
-    for (int i = count/ (sizeof(int) / sizeof(sycl::half)); i < count/(sizeof(int)/sizeof(sycl::half)) + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT; ++i) {
-        int thread_idx = (i - count / (sizeof(int) / sizeof(sycl::half))) / DEBUG_DATA_SIZE;
-        //if ((i - count / (sizeof(int) / sizeof(sycl::half))) % DEBUG_DATA_SIZE == 0)
-        //    printf("\nthread%d\n", thread_idx);
-        //printf("%d, ", ((int *)ptr)[i]);
+    //for (int i = count/ (sizeof(int) / sizeof(sycl::half)); i < count/(sizeof(int)/sizeof(sycl::half)) + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT; ++i) {
+    //    int thread_idx = (i - count / (sizeof(int) / sizeof(sycl::half))) / DEBUG_DATA_SIZE;
+    //    //if ((i - count / (sizeof(int) / sizeof(sycl::half))) % DEBUG_DATA_SIZE == 0)
+    //    //    printf("\nthread%d\n", thread_idx);
+    //    //printf("%d, ", ((int *)ptr)[i]);
 
-        //check the counter
-        {
-            if (((int *)ptr)[i] >= LOOP_COUNT_LIMIT)
-            {
-                int rel_idx = (i - count / (sizeof(int) / sizeof(sycl::half)));
+    //    //check the counter
+    //    {
+    //        if (((int *)ptr)[i] >= LOOP_COUNT_LIMIT)
+    //        {
+    //            int rel_idx = (i - count / (sizeof(int) / sizeof(sycl::half)));
 
-                printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n##### POTENTIAL HANG #####\n");
-                printf("counter=%d\n", ((int *)ptr)[i]);
-                printf("whileloop ID=%d\n", ((int *)ptr)[i - 1]);
-                printf("thread ID=%d\n", thread_idx);
-                printf("debug element ID=%d\n", rel_idx % DEBUG_DATA_SIZE);
-                printf("rank%d iter%d\n", ((int *)ptr)[i + 1], ((int *)ptr)[i + 2]);
-                printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-            }
-        }
-    }
+    //            printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n##### POTENTIAL HANG #####\n");
+    //            printf("counter=%d\n", ((int *)ptr)[i]);
+    //            printf("whileloop ID=%d\n", ((int *)ptr)[i - 1]);
+    //            printf("thread ID=%d\n", thread_idx);
+    //            printf("debug element ID=%d\n", rel_idx % DEBUG_DATA_SIZE);
+    //            printf("rank%d iter%d\n", ((int *)ptr)[i + 1], ((int *)ptr)[i + 2]);
+    //            printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+    //        }
+    //    }
+    //}
 
     if (check_output)
     {
@@ -112,6 +112,12 @@ int main(int argc, char* argv[]) {
 
   alloc_size = count * sizeof(sycl::half);
 
+  if (count > MAX_COUNT)
+  {
+      printf("error: count cannot be larger than %d\n", MAX_COUNT);
+      return -1;
+  }
+
   // init section
   auto ret = MPI_Init(&argc, &argv);
   if (ret == MPI_ERR_OTHER) {
@@ -125,7 +131,7 @@ int main(int argc, char* argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   
-  printf("buffer size=%d\n", (int)(alloc_size * world));
+  printf("buffer size=%d\n", (int)(alloc_size));
 
   // rank 0, device 0, subdevice 0
   // rank 1, device 0, subdevice 1
@@ -133,9 +139,7 @@ int main(int argc, char* argv[]) {
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
   allreducer<sycl::half> ar;
-  //printf("DEBUG rank%d: init\n", rank);
   ar.init(queue, rank, world);
-  //printf("DEBUG rank%d: malloc_shared\n", rank);
   // temporal buffer used for allreduce temporal use only.
   void* buffer = sycl::malloc_shared(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
   using namespace __ESIMD_NS;
@@ -143,7 +147,6 @@ int main(int argc, char* argv[]) {
   uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
   int wg_size = 1;
   sycl::event e;
-  //printf("DEBUG rank%d: input_init_kernel\n", rank);
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel1>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
@@ -178,7 +181,7 @@ int main(int argc, char* argv[]) {
       }
   }
 
-  printf("DEBUG rank%d: allreduce\n", rank);
+  printf("rank%d: allreduce\n", rank);
   
   //warm up runs
   ar.allreduce(queue, buffer, count, 3, false);
@@ -206,12 +209,9 @@ int main(int argc, char* argv[]) {
 
   // avoid race condition
   queue.wait();
-  //printf("DEBUG rank%d: MPI_Barrier\n", rank);
   MPI_Barrier(MPI_COMM_WORLD);
-  //printf("DEBUG rank%d: MPI_Finalize\n", rank);
   MPI_Finalize();
 
-  //printf("DEBUG rank%d: check result\n", rank);
   check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, true, -1);
   //std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
