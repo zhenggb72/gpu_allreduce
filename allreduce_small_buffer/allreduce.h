@@ -201,6 +201,7 @@ public:
                         //ESIMD kernel
                         uint offset = idx * SIMD * UNROLL_SIZE * kernel_inner_loop;
                         simd<data_type, max_rank * SIMD * UNROLL_SIZE> buffer; //64 registers
+                        simd<data_type, SIMD> buffer_small; 
                         simd<ushort, SIMD_ATOMIC> ramp;
 
                         //to do:
@@ -219,7 +220,7 @@ public:
                         for (int i = 0; i < kernel_inner_loop; i++) {
     #pragma unroll
                             for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
-                                buffer.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::cached, cache_hint::cached>
+                                buffer_small.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::cached, cache_hint::cached>
                                     ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE);
                             }
 
@@ -230,7 +231,7 @@ public:
     #pragma unroll
                             for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
                                 lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                                    ((data_type *)local_temp_ptr + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, buffer.template select<SIMD, 1>(unroll_i * SIMD));
+                                    ((data_type *)local_temp_ptr + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, buffer_small.template select<SIMD, 1>(unroll_i * SIMD));
                             }
                         }
                         lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::gpus>();
