@@ -22,7 +22,8 @@
 #define TRIPLE_BUFFER 3
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
-#define MAX_COUNT (512*1024)
+#define MAX_THREAD (512*4)
+#define MAX_COUNT (SIMD * UNROLL_SIZE * kernel_inner_loop * MAX_THREAD)
 #define LOOP_COUNT_LIMIT (1000000)
 #define DEBUG_DATA_SIZE 16
 #define DEBUG_THREAD_COUNT 2
@@ -114,39 +115,41 @@ public:
         data_size_per_buffer = ((data_size_per_buffer * sizeof(data_type) + ALIGNMENT_BYTE - 1) / ALIGNMENT_BYTE) * ALIGNMENT_BYTE / sizeof(data_type); //aligned size
         size_per_buffer = data_size_per_buffer * sizeof(data_type) + SYNC_BYTE;
         int size_per_buffer_kernel = size_per_buffer;
-        void* local_triple_buffer = sycl::malloc_shared(size_per_buffer * TRIPLE_BUFFER, queue);
+        void* local_triple_buffer = sycl::malloc_device(size_per_buffer * TRIPLE_BUFFER, queue);
 
         uint32_t total_threads_needed = (SYNC_BYTE /sizeof(data_type) + SIMD - 1) / SIMD;
         int wg_size = 1;
         uint32_t buffer_offset_to_sync = data_size_per_buffer;
-        sycl::event e;
+        //sycl::event e;
         //initialize the sync buffers to 0.
         //format of the triple buffer: count_sync_count_sync_count_sync
         //There are three sync buffers in triple buffer.
-        e = queue.submit([&](sycl::handler& cgh) {
-            cgh.parallel_for<class copy_kernel2>(
-                sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
+        //e = queue.submit([&](sycl::handler& cgh) {
+        //    cgh.parallel_for<class copy_kernel2>(
+        //        sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
-                  simd<data_type, SIMD> grf; //4 registers allocated.
-                  uint32_t index = idx * SIMD;
+        //          simd<data_type, SIMD> grf; //4 registers allocated.
+        //          uint32_t index = idx * SIMD;
 
-                  // init buffer
-                  grf = 0;
-                  data_type * ptr = (data_type*)local_triple_buffer;
-                  //init the sync buffer in triple buffer
-                  lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                      (ptr + index + buffer_offset_to_sync, grf);
-                  lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                      (ptr + index + buffer_offset_to_sync + size_per_buffer_kernel / sizeof(data_type), grf);
-                  lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                      (ptr + index + buffer_offset_to_sync + 2 * size_per_buffer_kernel / sizeof(data_type), grf);
-                  lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+        //          // init buffer
+        //          grf = 0;
+        //          data_type * ptr = (data_type*)local_triple_buffer;
+        //          //init the sync buffer in triple buffer
+        //          lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        //              (ptr + index + buffer_offset_to_sync, grf);
+        //          lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        //              (ptr + index + buffer_offset_to_sync + size_per_buffer_kernel / sizeof(data_type), grf);
+        //          lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+        //              (ptr + index + buffer_offset_to_sync + 2 * size_per_buffer_kernel / sizeof(data_type), grf);
+        //          lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
 
-                });
-        });
-        e.wait();
+        //        });
+        //});
+        //e.wait();
 
         // XXX: gain access to remote pointers
+        auto e = queue.memset(local_triple_buffer, 0, size_per_buffer * TRIPLE_BUFFER);
+        e.wait();
         exchange_peer_ipc_mem(queue, local_triple_buffer);
         initialized = true;
 
@@ -192,6 +195,7 @@ public:
 
         for (r = 0; r < repetition; r++)
         {
+            //printf("rank%d repetition%d\n", rank, r);
             ctimer.start(r);
             if(r == 1)
                 ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
@@ -248,22 +252,26 @@ public:
                         //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
                         simd_mask<SIMD_ATOMIC> pred;
                         simd<int, SIMD_ATOMIC>status0;
-                        pred = false;
-                        pred[0] = true;
-                        //pred[14] = pred[15] = false;
 
                         //sync locally within local GPU first.
                         int * local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
                         local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
-                        status0 = lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                            (local_sync_ptr, ramp, pred);
 
-                        //wait for all the local TG to sync. Then sync the other remote GPUs
+                        //if there are more than 1 threads required per rank, then do the local sync within the rank first.
+                        if (total_threads_needed > 1)
                         {
-                            while (status0[0] != total_threads_needed)
+                            pred = false;
+                            pred[0] = true;
+                            status0 = lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                                (local_sync_ptr, ramp, pred);
+
+                            //wait for all the local TG to sync. Then sync the other remote GPUs
                             {
-                                status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                    (local_sync_ptr, ramp, pred);
+                                while (status0[0] != total_threads_needed)
+                                {
+                                    status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                                        (local_sync_ptr, ramp, pred);
+                                }
                             }
                         }
 

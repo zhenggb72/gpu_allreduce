@@ -20,8 +20,6 @@ mpirun -np 16 ./allreduce -c 32768 -t float
 mpirun -np 16 ./allreduce -c 65536 -t float
 mpirun -np 16 ./allreduce -c 131072 -t float
 mpirun -np 16 ./allreduce -c 262144 -t float
-mpirun -np 16 ./allreduce -c 458752 -t float
-mpirun -np 16 ./allreduce -c 524288 -t float
 mpirun -np 16 ./allreduce -c 11 -t float
 mpirun -np 16 ./allreduce -c 222 -t float
 mpirun -np 16 ./allreduce -c 3333 -t float
@@ -42,8 +40,6 @@ mpirun -np 16 ./allreduce -c 32767 -t float
 mpirun -np 16 ./allreduce -c 65535 -t float
 mpirun -np 16 ./allreduce -c 131071 -t float
 mpirun -np 16 ./allreduce -c 262143 -t float
-mpirun -np 16 ./allreduce -c 458751 -t float
-mpirun -np 16 ./allreduce -c 524287 -t float
 mpirun -np 16 ./allreduce -c 17 -t float
 mpirun -np 16 ./allreduce -c 34 -t float
 mpirun -np 16 ./allreduce -c 65 -t float
@@ -59,8 +55,6 @@ mpirun -np 16 ./allreduce -c 16385 -t float
 mpirun -np 16 ./allreduce -c 32769 -t float
 mpirun -np 16 ./allreduce -c 65537 -t float
 mpirun -np 16 ./allreduce -c 131073 -t float
-mpirun -np 16 ./allreduce -c 262145 -t float
-mpirun -np 16 ./allreduce -c 458753 -t float
 
 mpirun -np 8 ./allreduce -c 16 -t float
 mpirun -np 8 ./allreduce -c 32 -t float
@@ -78,8 +72,6 @@ mpirun -np 8 ./allreduce -c 32768 -t float
 mpirun -np 8 ./allreduce -c 65536 -t float
 mpirun -np 8 ./allreduce -c 131072 -t float
 mpirun -np 8 ./allreduce -c 262144 -t float
-mpirun -np 8 ./allreduce -c 458752 -t float
-mpirun -np 8 ./allreduce -c 524288 -t float
 mpirun -np 8 ./allreduce -c 11 -t float
 mpirun -np 8 ./allreduce -c 222 -t float
 mpirun -np 8 ./allreduce -c 3333 -t float
@@ -100,8 +92,6 @@ mpirun -np 8 ./allreduce -c 32767 -t float
 mpirun -np 8 ./allreduce -c 65535 -t float
 mpirun -np 8 ./allreduce -c 131071 -t float
 mpirun -np 8 ./allreduce -c 262143 -t float
-mpirun -np 8 ./allreduce -c 458751 -t float
-mpirun -np 8 ./allreduce -c 524287 -t float
 mpirun -np 8 ./allreduce -c 17 -t float
 mpirun -np 8 ./allreduce -c 34 -t float
 mpirun -np 8 ./allreduce -c 65 -t float
@@ -117,8 +107,6 @@ mpirun -np 8 ./allreduce -c 16385 -t float
 mpirun -np 8 ./allreduce -c 32769 -t float
 mpirun -np 8 ./allreduce -c 65537 -t float
 mpirun -np 8 ./allreduce -c 131073 -t float
-mpirun -np 8 ./allreduce -c 262145 -t float
-mpirun -np 8 ./allreduce -c 458753 -t float
 
 mpirun -np 6 ./allreduce -c 16 -t float
 mpirun -np 6 ./allreduce -c 32 -t float
@@ -136,8 +124,6 @@ mpirun -np 6 ./allreduce -c 32768 -t float
 mpirun -np 6 ./allreduce -c 65536 -t float
 mpirun -np 6 ./allreduce -c 131072 -t float
 mpirun -np 6 ./allreduce -c 262144 -t float
-mpirun -np 6 ./allreduce -c 458752 -t float
-mpirun -np 6 ./allreduce -c 524288 -t float
 mpirun -np 6 ./allreduce -c 11 -t float
 mpirun -np 6 ./allreduce -c 222 -t float
 mpirun -np 6 ./allreduce -c 3333 -t float
@@ -158,8 +144,6 @@ mpirun -np 6 ./allreduce -c 32767 -t float
 mpirun -np 6 ./allreduce -c 65535 -t float
 mpirun -np 6 ./allreduce -c 131071 -t float
 mpirun -np 6 ./allreduce -c 262143 -t float
-mpirun -np 6 ./allreduce -c 458751 -t float
-mpirun -np 6 ./allreduce -c 524287 -t float
 mpirun -np 6 ./allreduce -c 17 -t float
 mpirun -np 6 ./allreduce -c 34 -t float
 mpirun -np 6 ./allreduce -c 65 -t float
@@ -175,8 +159,6 @@ mpirun -np 6 ./allreduce -c 16385 -t float
 mpirun -np 6 ./allreduce -c 32769 -t float
 mpirun -np 6 ./allreduce -c 65537 -t float
 mpirun -np 6 ./allreduce -c 131073 -t float
-mpirun -np 6 ./allreduce -c 262145 -t float
-mpirun -np 6 ./allreduce -c 458753 -t float
 
 mpirun -np 4 ./allreduce -c 16 -t float
 mpirun -np 4 ./allreduce -c 32 -t float
@@ -194,8 +176,6 @@ mpirun -np 4 ./allreduce -c 32768 -t float
 mpirun -np 4 ./allreduce -c 65536 -t float
 mpirun -np 4 ./allreduce -c 131072 -t float
 mpirun -np 4 ./allreduce -c 262144 -t float
-mpirun -np 4 ./allreduce -c 458752 -t float
-mpirun -np 4 ./allreduce -c 524288 -t float
 mpirun -np 4 ./allreduce -c 11 -t float
 mpirun -np 4 ./allreduce -c 222 -t float
 mpirun -np 4 ./allreduce -c 3333 -t float
@@ -216,8 +196,6 @@ mpirun -np 4 ./allreduce -c 32767 -t float
 mpirun -np 4 ./allreduce -c 65535 -t float
 mpirun -np 4 ./allreduce -c 131071 -t float
 mpirun -np 4 ./allreduce -c 262143 -t float
-mpirun -np 4 ./allreduce -c 458751 -t float
-mpirun -np 4 ./allreduce -c 524287 -t float
 mpirun -np 4 ./allreduce -c 17 -t float
 mpirun -np 4 ./allreduce -c 34 -t float
 mpirun -np 4 ./allreduce -c 65 -t float
@@ -233,8 +211,6 @@ mpirun -np 4 ./allreduce -c 16385 -t float
 mpirun -np 4 ./allreduce -c 32769 -t float
 mpirun -np 4 ./allreduce -c 65537 -t float
 mpirun -np 4 ./allreduce -c 131073 -t float
-mpirun -np 4 ./allreduce -c 262145 -t float
-mpirun -np 4 ./allreduce -c 458753 -t float
 
 mpirun -np 2 ./allreduce -c 16 -t float
 mpirun -np 2 ./allreduce -c 32 -t float
@@ -252,8 +228,6 @@ mpirun -np 2 ./allreduce -c 32768 -t float
 mpirun -np 2 ./allreduce -c 65536 -t float
 mpirun -np 2 ./allreduce -c 131072 -t float
 mpirun -np 2 ./allreduce -c 262144 -t float
-mpirun -np 2 ./allreduce -c 458752 -t float
-mpirun -np 2 ./allreduce -c 524288 -t float
 mpirun -np 2 ./allreduce -c 11 -t float
 mpirun -np 2 ./allreduce -c 222 -t float
 mpirun -np 2 ./allreduce -c 3333 -t float
@@ -274,8 +248,6 @@ mpirun -np 2 ./allreduce -c 32767 -t float
 mpirun -np 2 ./allreduce -c 65535 -t float
 mpirun -np 2 ./allreduce -c 131071 -t float
 mpirun -np 2 ./allreduce -c 262143 -t float
-mpirun -np 2 ./allreduce -c 458751 -t float
-mpirun -np 2 ./allreduce -c 524287 -t float
 mpirun -np 2 ./allreduce -c 17 -t float
 mpirun -np 2 ./allreduce -c 34 -t float
 mpirun -np 2 ./allreduce -c 65 -t float
@@ -291,5 +263,3 @@ mpirun -np 2 ./allreduce -c 16385 -t float
 mpirun -np 2 ./allreduce -c 32769 -t float
 mpirun -np 2 ./allreduce -c 65537 -t float
 mpirun -np 2 ./allreduce -c 131073 -t float
-mpirun -np 2 ./allreduce -c 262145 -t float
-mpirun -np 2 ./allreduce -c 458753 -t float
