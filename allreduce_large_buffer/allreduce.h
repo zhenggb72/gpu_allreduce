@@ -21,9 +21,9 @@
 #define SIMD_SYNC 32
 #define SYNC_BYTE (SIMD_SYNC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
-#define MAX_COUNT (32*1024*1024/sizeof(data_type))
+#define MAX_COUNT (64*1024*1024/sizeof(data_type))
 #define EU_COUNT_PER_RANK 512
-#define THREAD_COUNT_PER_EU 8
+#define THREAD_COUNT_PER_EU 4
 #define HW_THREAD_COUNT (EU_COUNT_PER_RANK * THREAD_COUNT_PER_EU)
 #define KERNEL_NUM 5
 #define RANKS_PER_GPU 2
