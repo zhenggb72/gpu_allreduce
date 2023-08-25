@@ -150,6 +150,15 @@ public:
         exchange_peer_ipc_mem(queue, local_triple_buffer);
         initialized = true;
 
+        //dummy kernel to avoid hang. The hang happens when there is no dummy kernel and allreduce() is called right after init().
+        e = queue.submit([&](sycl::handler& cgh) {
+            cgh.parallel_for<class _>(
+                sycl::nd_range<1>({ 1 }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
+
+                });
+        });
+        e.wait();
+
     }
     void allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, bool print_en){
         using namespace __ESIMD_NS;
@@ -177,7 +186,7 @@ public:
             temp_sync_buffer[i] = sync_buffer[i];
         }
         uint32_t total_threads_needed = (size + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop); //ceiling
-        printf("rank%d required gpu hw thread count = %d\n", rank, total_threads_needed);
+        //printf("rank%d required gpu hw thread count = %d\n", rank, total_threads_needed);
         int wg_size = 1;
         int size_per_buffer_kernel = size_per_buffer;
 
@@ -187,9 +196,9 @@ public:
             if(r == 1)
                 ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
 
-            int index_to_triple_buffer = r % 3;
-            buffer_index = index_to_triple_buffer;
-            int buffer_index_kernel = index_to_triple_buffer;
+            int buffer_index_kernel = buffer_index;
+            buffer_index++;
+            buffer_index %= 3;
             e[r] = queue.submit([&](sycl::handler& cgh) {
                 cgh.parallel_for<class Allreduce_kernel>(
                     sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{

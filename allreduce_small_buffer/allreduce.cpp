@@ -22,6 +22,37 @@ void *mmap_host(size_t map_size, int dma_buf_fd) {
   return mmap(nullptr, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, dma_buf_fd, 0);
 }
 
+void *mmap_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  alignas(64) exchange_contents send_buf;
+
+  // fill in the exchange info
+  zeCheck(zeMemGetIpcHandle(l0_ctx, base_addr, &send_buf.ipc_handle));
+  auto* host_ptr = mmap_host(base_size, send_buf.fd);
+  return (char *) host_ptr + ((char *)ptr - (char *)base_addr);
+}
+
+void *copy_device_to_host(void *ptr, sycl::queue queue) {
+  sycl::context ctx = queue.get_context();
+  auto l0_ctx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(ctx);
+
+  void *base_addr;
+  size_t base_size;
+  zeCheck(zeMemGetAddressRange(l0_ctx, ptr, &base_addr, &base_size));
+
+  auto * host_ptr = sycl::malloc_host(base_size, queue);
+  queue.memcpy(host_ptr, ptr, base_size);
+  queue.wait();
+
+  return host_ptr;
+}
+
 template <typename T>
 bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int iter) {
     bool returnval = true;
@@ -138,10 +169,10 @@ int main(int argc, char* argv[]) {
   // rank 2, device 1, subdevice 0
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
-  allreducer<sycl::half> ar;
-  ar.init(queue, rank, world);
+  //allreducer<sycl::half> ar;
+  //ar.init(queue, rank, world);
   // temporal buffer used for allreduce temporal use only.
-  void* buffer = sycl::malloc_shared(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
+  void* buffer = sycl::malloc_device(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
   using namespace __ESIMD_NS;
   using namespace __ESIMD_ENS;
   uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
@@ -164,6 +195,10 @@ int main(int argc, char* argv[]) {
   });
   e.wait();
 
+  allreducer<sycl::half> ar;
+  ar.init(queue, rank, world);
+
+
   int repetition = 4;
   bool check = false;
 
@@ -184,7 +219,7 @@ int main(int argc, char* argv[]) {
   printf("rank%d: allreduce\n", rank);
   
   //warm up runs
-  ar.allreduce(queue, buffer, count, 3, false);
+  ar.allreduce(queue, buffer, count, repetition, false);
   //reinit the input buffer content
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel2>(
@@ -212,7 +247,8 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 
-  check = checkResults((sycl::half *)buffer, (sycl::half)sum, count, rank, true, -1);
+  auto *host_buffer = copy_device_to_host(buffer, queue);
+  check = checkResults((sycl::half *)host_buffer, (sycl::half)sum, count, rank, true, -1);
   //std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
   
@@ -224,4 +260,5 @@ int main(int argc, char* argv[]) {
   // Clean up, close/put ipc handles, free memory, etc.
   ar.release(queue);
   sycl::free(buffer, queue);
+  sycl::free(host_buffer, queue);
 }
