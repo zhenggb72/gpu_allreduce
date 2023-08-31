@@ -54,7 +54,7 @@ void *copy_device_to_host(void *ptr, sycl::queue queue) {
 }
 
 template <typename T>
-bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int iter) {
+bool checkResults(T *ptr, size_t count, int rank, bool check_output, int iter, int out_loop, int world, int repetition) {
     bool returnval = true;
 
 #if DEBUG_DUMP_TO_DEDICATED_OFFSET
@@ -86,11 +86,45 @@ bool checkResults(T *ptr, T c, size_t count, int rank, bool check_output, int it
     if (check_output)
     {
         for (int i = 0; i < count; ++i) {
-            if (ptr[i] != c)
+            T in[MAX_RANK];
+            //create the input values
+            for (int r = 0; r < world; ++r)
             {
-                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)c, (double)ptr[i]);
+                in[r] = (r + ((i / SIMD_INIT) & 0x3ff) + (i & 0x3f)) * SMALLEST_NORM_FP16;
+            }
+            //compute the reference result.
+            T sum;
+            sum = 0;
+            for (int s = 0; s < out_loop; ++s)
+            for (int rep = 0; rep < repetition; ++rep)
+            {
+                sum = 0;
+                for (int r = 0; r < world; r += 1)
+                {
+                    sum += (T)(in[r]);
+                }
+                for (int r = 0; r < world; ++r)
+                {
+                    in[r] = sum;
+                }
+            }
+
+            //sum = c;
+            //check the kernel result against the reference result
+            if (ptr[i] != (T)sum)
+            {
+                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
                 returnval = false;
                 return returnval;
+            }
+            else
+            {
+                static bool printed = false;
+                if (!printed)
+                {
+                    printf("rank%d: Matched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
+                    printed = true;
+                }
             }
         }
     }
@@ -169,26 +203,31 @@ int main(int argc, char* argv[]) {
   // rank 2, device 1, subdevice 0
   // ...
   auto queue = currentQueue(rank / 2, rank & 1);
+  assert(queue.is_in_order());
+
   //allreducer<sycl::half> ar;
   //ar.init(queue, rank, world);
   // temporal buffer used for allreduce temporal use only.
   void* buffer = sycl::malloc_device(alloc_size + DEBUG_DATA_SIZE * DEBUG_THREAD_COUNT * sizeof(int), queue);
   using namespace __ESIMD_NS;
   using namespace __ESIMD_ENS;
-  uint32_t total_threads_needed = (count + SIMD - 1) / SIMD;
+  uint32_t total_threads_needed = (count + SIMD_INIT - 1) / SIMD_INIT;
   int wg_size = 1;
   sycl::event e;
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel1>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
-            simd<sycl::half, SIMD> grf; //4 registers allocated.
-            uint32_t index = idx * SIMD;
+            simd<sycl::half, SIMD_INIT> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD_INIT;
 
             // init buffer
-            grf = rank;
+            simd<int, SIMD_INIT> ramp;
+            for (int i = 0; i < SIMD_INIT; i++)
+                ramp[i] = i;
+            grf = (rank + (idx & 0x3ff) + ramp) * SMALLEST_NORM_FP16;
             sycl::half * ptr = (sycl::half*)buffer;
-            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
             lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
           });
@@ -199,39 +238,28 @@ int main(int argc, char* argv[]) {
   ar.init(queue, rank, world);
 
 
-  int repetition = 4;
+  int repetition = 1;
   bool check = false;
-
-  sycl::half sum;
-  if (repetition == 1)
-  {
-      sum = world * (world - 1) / 2;
-  }
-  else
-  {
-      sum = world * (world - 1) / 2;
-      for (int i = 0; i < repetition - 1; i++)
-      {
-          sum = (int)world * (int)sum;
-      }
-  }
 
   printf("rank%d: allreduce\n", rank);
   
   //warm up runs
-  ar.allreduce(queue, buffer, count, repetition, false);
+  ar.allreduce(queue, buffer, count, 16, false);
   //reinit the input buffer content
   e = queue.submit([&](sycl::handler& cgh) {
       cgh.parallel_for<class input_init_kernel2>(
           sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
 
-            simd<sycl::half, SIMD> grf; //4 registers allocated.
-            uint32_t index = idx * SIMD;
+            simd<sycl::half, SIMD_INIT> grf; //4 registers allocated.
+            uint32_t index = idx * SIMD_INIT;
 
             // init buffer
-            grf = rank;
+            simd<int, SIMD_INIT> ramp;
+            for (int i = 0; i < SIMD_INIT; i++)
+                ramp[i] = i;
+            grf = (rank + (idx & 0x3ff) + ramp) * SMALLEST_NORM_FP16;
             sycl::half * ptr = (sycl::half*)buffer;
-            lsc_block_store<sycl::half, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+            lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
             lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
           });
@@ -240,7 +268,19 @@ int main(int argc, char* argv[]) {
 
 
   //real runs
-  ar.allreduce(queue, buffer, count, repetition, true);
+  cpu_timer<TEST_REP> ctimer;
+  int i;
+  ctimer.start(0);
+  for (i = 0; i < TEST_REP; i++)
+  {
+      ar.allreduce(queue, buffer, count, repetition, true);
+  }
+  ctimer.stop(0);
+  float cpu_time = ctimer.get_us(0) / TEST_REP;
+  //sleep(rank);
+  std::this_thread::sleep_for(std::chrono::milliseconds(rank * 100));
+  std::cout << "rank" << rank;
+  std::cout << "\t average cpu us= " << cpu_time << "\n";
 
   // avoid race condition
   queue.wait();
@@ -248,7 +288,7 @@ int main(int argc, char* argv[]) {
   MPI_Finalize();
 
   auto *host_buffer = copy_device_to_host(buffer, queue);
-  check = checkResults((sycl::half *)host_buffer, (sycl::half)sum, count, rank, true, -1);
+  check = checkResults((sycl::half *)host_buffer, count, rank, true, -1, TEST_REP, world, repetition);
   //std::cout<<"world:"<<world<<"\nrank:" <<rank <<"\nvalue:"<<((sycl::half *)buffer)[0]<<std::endl;
     
   

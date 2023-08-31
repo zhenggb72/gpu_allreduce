@@ -15,7 +15,7 @@
 #include <thread>
 
 #define MAX_RANK 16
-#define MAX_REPETITION 4
+#define MAX_REPETITION 6
 #define INIT_SIZE 64
 #define INIT_COUNT 1
 #define SIMD_INIT (INIT_SIZE * INIT_COUNT)
@@ -25,11 +25,13 @@
 #define SYNC_BYTE (SIMD_SYNC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
 #define MAX_COUNT (128*1024*1024/sizeof(data_type))
-#define EU_COUNT_PER_RANK 512
+#define EU_COUNT_PER_RANK 448
 #define THREAD_COUNT_PER_EU 8
 #define HW_THREAD_COUNT (EU_COUNT_PER_RANK * THREAD_COUNT_PER_EU)
 #define KERNEL_NUM 11
 #define RANKS_PER_GPU 2
+#define TEST_REP 50
+#define SMALLEST_NORM_FP16 0.00006103515625
 
 struct exchange_contents 
 {
@@ -393,16 +395,12 @@ public:
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
 
-        gpu_timer<KERNEL_NUM> gtimer;
-        cpu_timer<MAX_REPETITION + 1> ctimer;
-        float total_kernel_time ;
-        float kernel_time[KERNEL_NUM] ;
-
-        if (repetition > MAX_REPETITION)
-        {
-            //printf("error: repetition cannot be larger than %d. This is for the testing purpose only. If the repetition count is higher than the limit, all the results will be inf and testing won't be good.\n", MAX_REPETITION);
-            exit(-1);
-        }
+        //if (repetition > MAX_REPETITION)
+        //{
+        //    //printf("error: repetition cannot be larger than %d. This is for the testing purpose only. If the repetition count is higher than the limit, all the results will be inf and testing won't be good.\n", MAX_REPETITION);
+        //    exit(-1);
+        //}
+        sycl::event e;
         uint32_t temp_rank = rank;
         uint32_t temp_world = world;
         int r;
@@ -424,27 +422,16 @@ public:
         int outer_iter;
         //todo:
         //5. prefetch in persistent threads?
-        sycl::event e[KERNEL_NUM];
-        bool executed[KERNEL_NUM];
         int max_threads_per_MAX_COUNT = (MAX_COUNT / 2) / (SIMD_COMPUTE * temp_world);
         int max_elements_per_MAX_COUNT = max_threads_per_MAX_COUNT * (SIMD_COMPUTE * temp_world);
         for (r = 0; r < repetition; r++)
         {
-            ctimer.start(r);
-            if(r == 1)
-                ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
-
             int threads_already_processed = 0;
-            total_kernel_time = 0;
             outerloop_iter_count = (size + max_elements_per_MAX_COUNT - 1) / max_elements_per_MAX_COUNT; //this is the outerloop count that requires full hw thread count. This doesnt include the outloop iteration that only needs partial thread count
-            for (int i = 0; i < KERNEL_NUM; i++)
-                kernel_time[i] = 0;
             uint32_t total_threads_needed_sync = 1;
             for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
             {
                 int kernel_index = 0;
-                for (int i = 0; i < KERNEL_NUM; i++)
-                    executed[i] = false;
                 uint32_t total_threads_needed;
                 if ((outer_iter + 1) * max_elements_per_MAX_COUNT < size)
                 {
@@ -466,8 +453,7 @@ public:
 
 #if KERNEL_EXEC_MAP & 1
                 //Data is sent to other tile within the same gpu via MDFI
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_load_input_to_temp_buffer>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -506,17 +492,11 @@ public:
 
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel0\n");
 #endif
 #if KERNEL_EXEC_MAP & 2
                 //sync all the ranks within the single GPU.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_rankSync1>(
                         sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -554,17 +534,11 @@ public:
                             }
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel1\n");
 #endif
 #if KERNEL_EXEC_MAP & 4
                 //local reduction kernel
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_local_sum_and_distribute_to_remote_ranks>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -603,17 +577,11 @@ public:
 
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel2\n");
 #endif
 #if KERNEL_EXEC_MAP & 8
                 //sync all the ranks here before consuming the results.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_rankSync2>(
                         sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -655,17 +623,11 @@ public:
                             }
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel3\n");
 #endif
 #if KERNEL_EXEC_MAP & 16
                 //local reduction kernel
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_all_sum>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -704,17 +666,11 @@ public:
 
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel6\n");
 #endif
 #if KERNEL_EXEC_MAP & 32
                 //sync all the ranks here before consuming the results.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_rankSync4>(
                         sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -756,17 +712,11 @@ public:
                             }
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel7\n");
 #endif
 #if KERNEL_EXEC_MAP & 64
                 //copy the results to all the ranks.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_gather_from_remote_and_dist_to_rank_pair>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -802,17 +752,11 @@ public:
                             }
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel8\n");
 #endif
 #if KERNEL_EXEC_MAP & 128
                 //sync all the ranks within the same GPU.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_rankSync5>(
                         sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -855,17 +799,11 @@ public:
                                 (sync_ptr, ramp, status0, pred); //initialize the counter for the next run
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel9\n");
 #endif
 #if KERNEL_EXEC_MAP & 256
                 //copy the results to all the ranks.
-                executed[kernel_index] = true;
-                e[kernel_index] = queue.submit([&](sycl::handler& cgh)
+                e = queue.submit([&](sycl::handler& cgh)
                 {
                     cgh.parallel_for<class Kernel_write_output>(
                         sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -901,11 +839,6 @@ public:
                             }
                         });//parallel_for
                 });//submit()
-                e[kernel_index].wait();
-                gtimer.record(kernel_index, e[kernel_index]);
-                total_kernel_time += gtimer.get_us(kernel_index);
-                kernel_time[kernel_index] += gtimer.get_us(kernel_index);
-                kernel_index++;
                 //printf("kernel10\n");
 #endif
 
@@ -913,14 +846,11 @@ public:
                 buffer_index_kernel &= 1;
                 threads_already_processed += total_threads_needed;
             }//for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
-            ctimer.stop(r);
         } // for (r = 0; r < repetition; r++)
         buffer_index += outerloop_iter_count * repetition;
         buffer_index &= 1;
-        ctimer.stop(MAX_REPETITION);
-
-        *cpu_time = ctimer.get_us(MAX_REPETITION) / (repetition - 1);
-        return total_kernel_time;
+        e.wait();
+        return 0;
     }
     void release(sycl::queue& queue)
     {        

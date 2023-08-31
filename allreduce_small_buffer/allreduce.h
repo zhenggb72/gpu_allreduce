@@ -14,7 +14,7 @@
 #include <chrono>
 #include <thread>
 
-#define MAX_REPETITION 4
+#define MAX_REPETITION 16
 #define SIMD 128
 #define SIMD_ATOMIC 16
 #define MAX_RANK 16
@@ -22,13 +22,20 @@
 #define TRIPLE_BUFFER 3
 #define SYNC_BYTE (SIMD_ATOMIC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
-#define MAX_THREAD (512*4)
+#define EU_COUNT 448
+#define THREADS_PER_EU 8
+#define MAX_THREAD (EU_COUNT*THREADS_PER_EU)
 #define MAX_COUNT (SIMD * UNROLL_SIZE * kernel_inner_loop * MAX_THREAD)
 #define LOOP_COUNT_LIMIT (1000000)
 #define DEBUG_DATA_SIZE 16
 #define DEBUG_THREAD_COUNT 2
 #define DEBUG_DUMP_TO_DEDICATED_OFFSET 1
 #define DEBUG 0
+#define TEST_REP 50
+#define INIT_SIZE 64
+#define INIT_COUNT 1
+#define SIMD_INIT (INIT_SIZE * INIT_COUNT)
+#define SMALLEST_NORM_FP16 0.00006103515625
 
 const int kernel_inner_loop = 1;
 
@@ -167,15 +174,14 @@ public:
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
 
-        gpu_timer<MAX_REPETITION> gtimer;
-        cpu_timer<MAX_REPETITION + 1> ctimer;
-        sycl::event e[MAX_REPETITION];
+        //sycl::event e[MAX_REPETITION];
 
-        if (repetition > MAX_REPETITION)
-        {
-            printf("error: repetition cannot be larger than %d\n", MAX_REPETITION);
-            exit(-1);
-        }
+        //if (repetition > MAX_REPETITION)
+        //{
+        //    printf("error: repetition cannot be larger than %d\n", MAX_REPETITION);
+        //    exit(-1);
+        //}
+        sycl::event e;
         uint32_t temp_rank = rank;
         uint32_t temp_world = world;
         int r;
@@ -189,26 +195,24 @@ public:
             temp_sync_buffer[i] = sync_buffer[i];
         }
         uint32_t total_threads_needed = (size + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop); //ceiling
-        //printf("rank%d required gpu hw thread count = %d\n", rank, total_threads_needed);
-        int wg_size = 1;
+        int wg_size = 8;
         int size_per_buffer_kernel = size_per_buffer;
+        uint32_t total_threads_dispatched = (total_threads_needed + wg_size - 1) / wg_size * wg_size;
+        uint32_t total_wg_count = total_threads_dispatched / wg_size;
+        //printf("rank%d required gpu hw thread count = %d, dispatched %d threads\n", rank, total_threads_needed, total_threads_dispatched);
 
         for (r = 0; r < repetition; r++)
         {
-            //printf("rank%d repetition%d\n", rank, r);
-            ctimer.start(r);
-            if(r == 1)
-                ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
-
             int buffer_index_kernel = buffer_index;
             buffer_index++;
             buffer_index %= 3;
-            e[r] = queue.submit([&](sycl::handler& cgh) {
+            //e[r] = queue.submit([&](sycl::handler& cgh) {
+            e = queue.submit([&](sycl::handler& cgh) {
                 cgh.parallel_for<class Allreduce_kernel>(
-                    sycl::nd_range<1>({ total_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL{
-
+                    sycl::nd_range<1>({ total_threads_dispatched }, wg_size), [=](sycl::nd_item<1> idx2) SYCL_ESIMD_KERNEL{
+                        
                         //slm_init(1024);
-                        //uint32_t idx = idx2.get_linear_id();
+                        uint32_t idx = idx2.get_global_id();
 
                         /////////////////////////////////////////////////////////////////////////////////
                         //ESIMD kernel
@@ -216,6 +220,9 @@ public:
                         simd<data_type, max_rank * SIMD * UNROLL_SIZE> buffer; //64 registers
                         simd<data_type, SIMD> buffer_small; 
                         simd<ushort, SIMD_ATOMIC> ramp;
+                        simd_mask<SIMD_ATOMIC> pred;
+                        simd<int, SIMD_ATOMIC>status0;
+                        int * local_sync_ptr;
 
                         //to do:
                         //O3 compiler optimization: not much difference after the change.
@@ -223,57 +230,68 @@ public:
                         //tune the cacheability for each IO message: no noticeable improvement
                         //tune the thread size: not much improvements
                         //tune the polling freq
-    #pragma unroll
-                        for (uint32_t i = 0; i < SIMD_ATOMIC; i++)
+
+                        //process the input only if the thread is useful
+                        if (idx < total_threads_needed)
                         {
-                            ramp[i] = i * sizeof(int);
-                        }
-
-                        //do copy from input buffer to temp buffer.
-                        for (int i = 0; i < kernel_inner_loop; i++) {
-    #pragma unroll
-                            for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
-                                buffer_small.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::cached, cache_hint::cached>
-                                    ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE);
+#pragma unroll
+                            for (uint32_t i = 0; i < SIMD_ATOMIC; i++)
+                            {
+                                ramp[i] = i * sizeof(int);
                             }
 
-                            //use the temp buffer for the current rank to copy the data to.
-                            data_type * local_temp_ptr = (data_type*)temp_buffer[temp_rank];
-                            local_temp_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(data_type)); //point to the correct buffer inside the triple buffer
+                            //do copy from input buffer to temp buffer.
+                            for (int i = 0; i < kernel_inner_loop; i++) {
+#pragma unroll
+                                for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
+                                    buffer_small.template select<SIMD, 1>(unroll_i * SIMD) = lsc_block_load<data_type, SIMD, lsc_data_size::default_size, cache_hint::cached, cache_hint::cached>
+                                        ((data_type *)inout_buffer + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE);
+                                }
 
-    #pragma unroll
-                            for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
-                                lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                                    ((data_type *)local_temp_ptr + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, buffer_small.template select<SIMD, 1>(unroll_i * SIMD));
+                                //use the temp buffer for the current rank to copy the data to.
+                                data_type * local_temp_ptr = (data_type*)temp_buffer[temp_rank];
+                                local_temp_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(data_type)); //point to the correct buffer inside the triple buffer
+
+#pragma unroll
+                                for (int unroll_i = 0; unroll_i < UNROLL_SIZE; unroll_i++) {
+                                    lsc_block_store<data_type, SIMD, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                                        ((data_type *)local_temp_ptr + offset + unroll_i * SIMD + i * SIMD * UNROLL_SIZE, buffer_small.template select<SIMD, 1>(unroll_i * SIMD));
+                                }
                             }
+                            lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::gpus>();
+
+                            //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
+
+                            //sync locally within local GPU first.
+                            local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
+                            local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
                         }
-                        lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::gpus>();
-
-                        //since each threads are copying small chunks of data to temp buffer, all the threads needs to sync globally using atomics within this rank
-                        simd_mask<SIMD_ATOMIC> pred;
-                        simd<int, SIMD_ATOMIC>status0;
-
-                        //sync locally within local GPU first.
-                        int * local_sync_ptr = (int*)temp_sync_buffer[temp_rank]; //the buffer might be located in remote GPU. But during the atomics, local L2 should be utilized.
-                        local_sync_ptr += (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
 
                         //if there are more than 1 threads required per rank, then do the local sync within the rank first.
                         if (total_threads_needed > 1)
                         {
+                            //do local sync in two steps. First using TG barrier. Then global L3 atomics.
+                            uint32_t local_tid = idx2.get_local_linear_id();
+
                             pred = false;
                             pred[0] = true;
-                            status0 = lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
-                                (local_sync_ptr, ramp, pred);
-
-                            //wait for all the local TG to sync. Then sync the other remote GPUs
+                            if (local_tid == 0)
                             {
-                                while (status0[0] != total_threads_needed)
+                                status0 = lsc_atomic_update<atomic_op::inc, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
+                                    (local_sync_ptr, ramp, pred);
+                                //wait for all the local TG to sync. Then sync the other remote GPUs
+                                while (status0[0] != total_wg_count)
                                 {
                                     status0 = lsc_atomic_update<atomic_op::load, int, SIMD_ATOMIC, lsc_data_size::default_size, cache_hint::none, cache_hint::none>
                                         (local_sync_ptr, ramp, pred);
                                 }
                             }
+                            barrier();
                         }
+
+                        //once the local sync is done, retire useless threads
+                        if (idx >= total_threads_needed)
+                            return;
 
                         //once the local level sync is done, atomically write its counter to other remote gpus' atomic counter
                         pred = false;
@@ -470,34 +488,11 @@ public:
 
                     });
             });
-            e[r].wait();
-            ctimer.stop(r);
+            //e[r].wait();
 
         } // for (r = 0; r < repetition; r++)
+        e.wait();
 
-        ctimer.stop(MAX_REPETITION);
-        for (r = 1; r < repetition; r++)
-        {
-            gtimer.record(r, e[r]);
-        }
-
-        if (print_en)
-        {
-            //sleep(temp_rank);
-            std::this_thread::sleep_for(std::chrono::milliseconds(temp_rank * 100));
-            for (r = 1; r < repetition; r++)
-            {
-                std::cout << "rank" << temp_rank << " rep_idx" << r << ": kernel us= " << gtimer.get_us(r);
-                std::cout << " host us= " << ctimer.get_us(r) << "\n";
-            }
-            std::cout << " avg host us= " << ctimer.get_us(MAX_REPETITION) / (repetition - 1) << "\n";
-
-        }
-        else
-        {
-            std::cout << "rank" << temp_rank << " warmup done " << "\n";
-
-        }
     }
     void release(sycl::queue& queue){        
         // Clean up, close/put ipc handles, free memory, etc.

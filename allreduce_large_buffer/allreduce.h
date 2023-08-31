@@ -13,7 +13,7 @@
 #include "sycl_misc.hpp"
 
 #define MAX_RANK 16
-#define MAX_REPETITION 4
+#define MAX_REPETITION 6
 #define INIT_SIZE 64
 #define INIT_COUNT 1
 #define SIMD_INIT (INIT_SIZE * INIT_COUNT)
@@ -22,8 +22,8 @@
 #define SYNC_BYTE (SIMD_SYNC * sizeof(int) * 2)
 #define ALIGNMENT_BYTE 256
 #define MAX_COUNT (64*1024*1024/sizeof(data_type))
-#define EU_COUNT_PER_RANK 512
-#define THREAD_COUNT_PER_EU 4
+#define EU_COUNT_PER_RANK 448
+#define THREAD_COUNT_PER_EU 8
 #define HW_THREAD_COUNT (EU_COUNT_PER_RANK * THREAD_COUNT_PER_EU)
 #define KERNEL_NUM 5
 #define RANKS_PER_GPU 2
@@ -34,6 +34,8 @@
 #define FOURTH_KERNEL 8
 #define FIFTH_KERNEL 16
 #define BUFFER_COUNT KERNEL_NUM
+#define TEST_REP 50
+#define SMALLEST_NORM_FP16 0.00006103515625
 
 struct exchange_contents 
 {
@@ -403,15 +405,12 @@ public:
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
 
-        float total_kernel_time ;
-        gpu_timer<KERNEL_NUM> gtimer;
-        cpu_timer<MAX_REPETITION + 1> ctimer;
-
-        if (repetition > MAX_REPETITION)
-        {
-            //printf("error: repetition cannot be larger than %d. This is for the testing purpose only. If the repetition count is higher than the limit, all the results will be inf and testing won't be good.\n", MAX_REPETITION);
-            exit(-1);
-        }
+        //if (repetition > MAX_REPETITION)
+        //{
+        //    //printf("error: repetition cannot be larger than %d. This is for the testing purpose only. If the repetition count is higher than the limit, all the results will be inf and testing won't be good.\n", MAX_REPETITION);
+        //    exit(-1);
+        //}
+        sycl::event e;
         uint32_t temp_rank = rank;
         uint32_t temp_world = world;
         int r;
@@ -435,7 +434,6 @@ public:
         //2. increase the simd size there are less number of innerloop iterations. This mgiht be useful in reducing hte load stalls since the number of loads-consume pair is less. DONE
         //3. reduce gpu-cpu sync?? DONE
         //5. prefetch in persistent threads? DONE
-        sycl::event e[2];
         uint32_t total_threads_needed_sync = 1;
         int wg_size = 1;
         int start, end;
@@ -446,11 +444,6 @@ public:
         int max_elements_per_MAX_COUNT = max_threads_per_MAX_COUNT * (SIMD_COMPUTE * temp_world);
         for (r = 0; r < repetition; r++)
         {
-            ctimer.start(r);
-            if (r == 1)
-                ctimer.start(MAX_REPETITION); //to measure the overall clk count starting from the second run
-
-            total_kernel_time = 0;
             outerloop_iter_count = size / max_elements_per_MAX_COUNT; //this is the outerloop count that requires full hw thread count. This doesnt include the outloop iteration that only needs partial thread count
 
             //init the sw pipeline
@@ -537,7 +530,7 @@ public:
 
                     //The first kernel does the actual computation while the second kernel does the sync across ranks.
                     //std::cout << "rank" << temp_rank << " iter" << iter << " outer_iter" << outer_iter << " kernel0 start." << "\n";
-                    e[0] = queue.submit([&](sycl::handler& cgh)
+                    queue.submit([&](sycl::handler& cgh)
                     {
                         cgh.parallel_for<class Kernel_compute>(
                             sycl::nd_range<1>({ persist_threads_needed }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -714,7 +707,6 @@ public:
 
                             });//parallel_for
                     });//submit()
-                    e[0].wait();
 
                     //std::cout << "rank" << temp_rank << " iter" << iter << " outer_iter" << outer_iter << " kernel0 done." << "\n";
 
@@ -726,7 +718,7 @@ public:
                     sync_reset_counter++;
 
                     //sync all the ranks within the single GPU.
-                    e[1] = queue.submit([&](sycl::handler& cgh)
+                    e = queue.submit([&](sycl::handler& cgh)
                     {
                         cgh.parallel_for<class Kernel_rankSync>(
                             sycl::nd_range<1>({ total_threads_needed_sync }, wg_size), [=](sycl::item<1> idx) SYCL_ESIMD_KERNEL
@@ -773,11 +765,6 @@ public:
                                     (sync_ptr, ramp, status0, pred); //initialize the counter for the next run
                             });//parallel_for
                     });//submit()
-                    e[1].wait();
-                    gtimer.record(1, e[1]);
-                    total_kernel_time += gtimer.get_us(1);
-                    gtimer.record(0, e[0]);
-                    total_kernel_time += gtimer.get_us(0);
 
                     //update the sw pipeline process state so that next kernel will be processed in next round
                     for (int i = 0; i < KERNEL_NUM; i++)
@@ -794,14 +781,13 @@ public:
                     buffer_index_kernel_for_sync &= 3;
                 }//for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
             }//for (int iter = 0; iter < 2; iter++)
-            ctimer.stop(r);
         } // for (r = 0; r < repetition; r++)
         buffer_index += sync_reset_counter;
         buffer_index &= 3;
-        ctimer.stop(MAX_REPETITION);
 
-        *cpu_time = ctimer.get_us(MAX_REPETITION) / (repetition - 1);
-        return total_kernel_time;
+        e.wait();
+
+        return 0;
     }
     void release(sycl::queue& queue)
     {        

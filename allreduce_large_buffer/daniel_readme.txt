@@ -20,7 +20,7 @@ source /opt/intel/oneapi/setvars.sh
 cd /home/cdrhee/workspace/dpcpp_and_esimd_version_large_buf
 bash ./daniel_build_run.sh
 bash ./daniel_run.sh
-/home/gca/cdrhee/pti-gpu/tools/onetrace/build/onetrace --chrome-call-logging --chrome-device-timeline --demangle --kernels-per-tile ./daniel_build_run.sh
+/home/cdrhee/pti-gpu/tools/onetrace/build/onetrace --chrome-call-logging --chrome-device-timeline --demangle --kernels-per-tile ./daniel_build_run.sh
 
 SMC machine (smc-ubb.itwn.intel.com (10.227.107.160)) root/intel@123
 Stable 8-PVC node.
