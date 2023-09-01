@@ -170,7 +170,7 @@ public:
         e.wait();
 
     }
-    void allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, bool print_en){
+    auto allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, bool print_en){
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
 
@@ -491,8 +491,7 @@ public:
             //e[r].wait();
 
         } // for (r = 0; r < repetition; r++)
-        e.wait();
-
+        return e;
     }
     void release(sycl::queue& queue){        
         // Clean up, close/put ipc handles, free memory, etc.

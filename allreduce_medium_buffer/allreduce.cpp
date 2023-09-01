@@ -252,8 +252,9 @@ int main(int argc, char* argv[]) {
   ctimer.start(0);
   for (i = 0; i < TEST_REP; i++)
   {
-      float total_kernel_time = ar.allreduce(queue, buffer, count, repetition, &cpu_time);
+      e = ar.allreduce(queue, buffer, count, repetition, &cpu_time);
   }
+  e.wait();
   ctimer.stop(0);
   cpu_time = ctimer.get_us(0) / TEST_REP;
 

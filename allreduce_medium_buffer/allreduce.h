@@ -390,7 +390,7 @@ public:
         initialized = true;
 
     }
-    float allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, float *cpu_time)
+    auto allreduce(sycl::queue& queue, void* inout_buffer, uint32_t size, int repetition, float *cpu_time)
     {
         using namespace __ESIMD_NS;
         using namespace __ESIMD_ENS;
@@ -849,8 +849,8 @@ public:
         } // for (r = 0; r < repetition; r++)
         buffer_index += outerloop_iter_count * repetition;
         buffer_index &= 1;
-        e.wait();
-        return 0;
+
+        return e;
     }
     void release(sycl::queue& queue)
     {        

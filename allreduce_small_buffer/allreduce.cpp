@@ -273,8 +273,9 @@ int main(int argc, char* argv[]) {
   ctimer.start(0);
   for (i = 0; i < TEST_REP; i++)
   {
-      ar.allreduce(queue, buffer, count, repetition, true);
+      e = ar.allreduce(queue, buffer, count, repetition, true);
   }
+  e.wait();
   ctimer.stop(0);
   float cpu_time = ctimer.get_us(0) / TEST_REP;
   //sleep(rank);
