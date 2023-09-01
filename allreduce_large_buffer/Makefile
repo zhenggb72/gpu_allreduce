@@ -9,7 +9,7 @@ CCL_ROOT=../ccl/release/_install
 INCLUDES=-I$(CCL_ROOT)/include
 LIBRARIES=-L$(CCL_ROOT)/lib -lmpi -lze_loader
 
-CXXFLAGS=-std=c++17 -fopenmp $(SYCLFLAGS) $(OPT) -Wall $(INCLUDES) $(LIBRARIES)
+CXXFLAGS=-std=c++17 -fopenmp $(SYCLFLAGS) $(OPT) -Wall $(INCLUDES) $(LIBRARIES) -Wextra -Wno-unused-parameter -Werror -Wno-implicit-fallthrough
 
 all : allreduce
 

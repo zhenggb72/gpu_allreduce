@@ -85,7 +85,7 @@ bool checkResults(T *ptr, size_t count, int rank, bool check_output, int iter, i
 
     if (check_output)
     {
-        for (int i = 0; i < count; ++i) {
+        for (unsigned long i = 0; i < count; ++i) {
             T in[MAX_RANK];
             //create the input values
             for (int r = 0; r < world; ++r)
@@ -113,7 +113,7 @@ bool checkResults(T *ptr, size_t count, int rank, bool check_output, int iter, i
             //check the kernel result against the reference result
             if (ptr[i] != (T)sum)
             {
-                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
+                printf("rank%d: mismatched at index %d, ref=%f, kernel=%f\n", rank, (int)i, (double)sum, (double)ptr[i]);
                 returnval = false;
                 return returnval;
             }
@@ -122,7 +122,7 @@ bool checkResults(T *ptr, size_t count, int rank, bool check_output, int iter, i
                 static bool printed = false;
                 if (!printed)
                 {
-                    printf("rank%d: Matched at index %d, ref=%f, kernel=%f\n", rank, i, (double)sum, (double)ptr[i]);
+                    printf("rank%d: Matched at index %d, ref=%f, kernel=%f\n", rank, (int)i, (double)sum, (double)ptr[i]);
                     printed = true;
                 }
             }

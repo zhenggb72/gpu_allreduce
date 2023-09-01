@@ -113,7 +113,7 @@ void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int t
     if (read_offset + SIMD_COMPUTE * TEMP_WORLD > size)
     {
         int count = (size - read_offset + SIMD_COMPUTE - 1) / SIMD_COMPUTE;
-        for (uint32_t i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
             buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 ((T *)inout_buffer + read_offset + i * SIMD_COMPUTE);
@@ -311,7 +311,7 @@ void write_output(int idx, void* inout_buffer, uint32_t size, int threads_alread
     if (write_offset + SIMD_COMPUTE * TEMP_WORLD > size)
     {
         int count = (size - write_offset + SIMD_COMPUTE - 1) / SIMD_COMPUTE;
-        for (uint32_t i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
             lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (write_ptr + i * SIMD_COMPUTE, results.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));
@@ -431,9 +431,8 @@ public:
             uint32_t total_threads_needed_sync = 1;
             for (outer_iter = 0; outer_iter < outerloop_iter_count; outer_iter++)
             {
-                int kernel_index = 0;
                 uint32_t total_threads_needed;
-                if ((outer_iter + 1) * max_elements_per_MAX_COUNT < size)
+                if ((outer_iter + 1) * max_elements_per_MAX_COUNT < (int)size)
                 {
                     total_threads_needed = max_threads_per_MAX_COUNT;
                 }
@@ -465,7 +464,7 @@ public:
                             for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
                             {
                                 int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
+                                if ((uint32_t)index >= total_threads_needed)
                                     break;
 
                                 switch (temp_world)
@@ -550,7 +549,7 @@ public:
                             for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
                             {
                                 int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
+                                if ((uint32_t)index >= total_threads_needed)
                                     break;
 
                                 switch (temp_world)
@@ -639,7 +638,7 @@ public:
                             for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
                             {
                                 int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
+                                if ((uint32_t)index >= total_threads_needed)
                                     break;
 
                                 switch (temp_world)
@@ -726,7 +725,7 @@ public:
                             for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
                             {
                                 int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
+                                if ((uint32_t)index >= total_threads_needed)
                                     break;
 
                                 switch (temp_world)
@@ -813,7 +812,7 @@ public:
                             for (int inner_iter = 0; inner_iter < innerloop_iter_count; inner_iter++)
                             {
                                 int index = idx + inner_iter * HW_THREAD_COUNT;
-                                if (index >= total_threads_needed)
+                                if ((uint32_t)index >= total_threads_needed)
                                     break;
 
                                 switch (temp_world)
@@ -896,7 +895,7 @@ private:
             &send_buf, sizeof(send_buf), MPI_BYTE, recv_buf, sizeof(send_buf), MPI_BYTE, MPI_COMM_WORLD);
 
         
-        for (uint32_t i = 0; i < world; i++)
+        for (int i = 0; i < world; i++)
         {
             // Step 4: Prepare pid file descriptor of next process
             auto* peer = recv_buf + i;

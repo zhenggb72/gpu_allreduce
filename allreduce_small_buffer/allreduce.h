@@ -121,12 +121,12 @@ public:
         data_size_per_buffer = ((MAX_COUNT + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop)) * SIMD * UNROLL_SIZE * kernel_inner_loop;
         data_size_per_buffer = ((data_size_per_buffer * sizeof(data_type) + ALIGNMENT_BYTE - 1) / ALIGNMENT_BYTE) * ALIGNMENT_BYTE / sizeof(data_type); //aligned size
         size_per_buffer = data_size_per_buffer * sizeof(data_type) + SYNC_BYTE;
-        int size_per_buffer_kernel = size_per_buffer;
+        //int size_per_buffer_kernel = size_per_buffer;
         void* local_triple_buffer = sycl::malloc_device(size_per_buffer * TRIPLE_BUFFER, queue);
 
-        uint32_t total_threads_needed = (SYNC_BYTE /sizeof(data_type) + SIMD - 1) / SIMD;
+        //uint32_t total_threads_needed = (SYNC_BYTE /sizeof(data_type) + SIMD - 1) / SIMD;
         int wg_size = 1;
-        uint32_t buffer_offset_to_sync = data_size_per_buffer;
+        //uint32_t buffer_offset_to_sync = data_size_per_buffer;
         //sycl::event e;
         //initialize the sync buffers to 0.
         //format of the triple buffer: count_sync_count_sync_count_sync
@@ -187,11 +187,11 @@ public:
         int r;
         assert(initialized == true);
         void* temp_buffer[max_rank];
-        for (uint32_t i = 0; i < world; i++) {
+        for (int i = 0; i < world; i++) {
             temp_buffer[i] = buffer[i];
         }
         void* temp_sync_buffer[max_rank];
-        for (uint32_t i = 0; i < world; i++) {
+        for (int i = 0; i < world; i++) {
             temp_sync_buffer[i] = sync_buffer[i];
         }
         uint32_t total_threads_needed = (size + SIMD * UNROLL_SIZE * kernel_inner_loop - 1) / (SIMD * UNROLL_SIZE * kernel_inner_loop); //ceiling
@@ -299,7 +299,7 @@ public:
                         if (idx == 0) //one thread in the local gpu notifies the remote gpu of its status.
                         {
                             status0 = total_threads_needed;
-                            for (int i = 0; i < temp_world; i++)
+                            for (uint32_t i = 0; i < temp_world; i++)
                             {
                                 int * sync_ptr;
 
@@ -457,7 +457,7 @@ public:
                             }
                             else //this is for 2,4,6 ranks. So there is no problem of overflowing the buffer.
                             {
-                                for (int r = 0; r < temp_world; r++)
+                                for (uint32_t r = 0; r < temp_world; r++)
                                 {
                                     int * peer_ptr = ((int*)temp_buffer[r]) + (buffer_index_kernel * size_per_buffer_kernel / sizeof(int));
     #pragma unroll
@@ -470,7 +470,7 @@ public:
                                 }
                                 //do the actual reduction
                                 result = 0;
-                                for (int r = 0; r < temp_world; r++)
+                                for (uint32_t r = 0; r < temp_world; r++)
                                 {
                                     //result += buffer.template select<SIMD * UNROLL_SIZE, 1>(r * SIMD * UNROLL_SIZE);
                                     result = result + buffer.template select<SIMD * UNROLL_SIZE, 1>(r * SIMD * UNROLL_SIZE);
@@ -497,7 +497,7 @@ public:
         // Clean up, close/put ipc handles, free memory, etc.
         auto l0_ctx = sycl::get_native<
             sycl::backend::ext_oneapi_level_zero>(queue.get_context());
-        for (uint32_t i = 0; i < world; i++){
+        for (int i = 0; i < world; i++){
             if (i != rank){
                 zeCheck(zeMemCloseIpcHandle(l0_ctx, (char *)buffer[i] - offset[i]));
             }                
@@ -533,7 +533,7 @@ private:
             &send_buf, sizeof(send_buf), MPI_BYTE, recv_buf, sizeof(send_buf), MPI_BYTE, MPI_COMM_WORLD);
 
         
-        for (uint32_t i = 0; i < world; i++){
+        for (int i = 0; i < world; i++){
             // Step 4: Prepare pid file descriptor of next process
             auto* peer = recv_buf + i;
             auto pid_fd = syscall(__NR_pidfd_open, peer->pid, 0);
