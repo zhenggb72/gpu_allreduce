@@ -1,0 +1,1219 @@
+.version 4.1
+
+.kernel "_ZTSZZN10allreducerIN4sycl3_V16detail9half_impl4halfELj16ELj1024EE9allreduceERNS1_5queueEPvjiPfENKUlRNS1_7handlerEE_clESB_E32Kernel_load_input_to_temp_buffer"
+
+/// VISA Predefined Variables
+// .decl V0 v_type=G v_name=%null
+// .decl V1 v_type=G v_name=%thread_x
+// .decl V2 v_type=G v_name=%thread_y
+// .decl V3 v_type=G v_name=%group_id_x
+// .decl V4 v_type=G v_name=%group_id_y
+// .decl V5 v_type=G v_name=%group_id_z
+// .decl V6 v_type=G v_name=%tsc
+// .decl V7 v_type=G v_name=%r0
+// .decl V8 v_type=G v_name=%arg
+// .decl V9 v_type=G v_name=%retval
+// .decl V10 v_type=G v_name=%sp
+// .decl V11 v_type=G v_name=%fp
+// .decl V12 v_type=G v_name=%hw_id
+// .decl V13 v_type=G v_name=%sr0
+// .decl V14 v_type=G v_name=%cr0
+// .decl V15 v_type=G v_name=%ce0
+// .decl V16 v_type=G v_name=%dbg0
+// .decl V17 v_type=G v_name=%color
+// .decl V18 v_type=G v_name=%impl_arg_buf_ptr
+// .decl V19 v_type=G v_name=%local_id_buf_ptr
+// .decl V20 v_type=G v_name=%msg0
+// .decl T0 v_type=T v_name=%slm
+// .decl T1 v_type=T v_name=T1
+// .decl T2 v_type=T v_name=T2
+// .decl T3 v_type=T v_name=TSS
+// .decl T4 v_type=T v_name=%bss
+// .decl T5 v_type=T v_name=%scratch
+
+.decl V32 v_type=G type=d num_elts=1 align=dword
+.decl V33 v_type=G type=d num_elts=1 align=dword
+.decl V34 v_type=G type=d num_elts=1 align=dword
+.decl V35 v_type=G type=uq num_elts=1 align=qword
+.decl V36 v_type=G type=d num_elts=1 align=dword
+.decl V37 v_type=G type=d num_elts=1 align=dword
+.decl V38 v_type=G type=uq num_elts=1 align=qword
+.decl V39 v_type=G type=d num_elts=1 align=dword
+.decl V40 v_type=G type=d num_elts=1 align=dword
+.decl V41 v_type=G type=d num_elts=1 align=dword
+.decl V42 v_type=G type=d num_elts=1 align=dword
+.decl V43 v_type=G type=w num_elts=3 align=word
+.decl V44 v_type=G type=d num_elts=3 align=dword
+.decl V45 v_type=G type=q num_elts=1 align=qword
+.decl V46 v_type=G type=uq num_elts=1 align=qword
+.decl V47 v_type=G type=uq num_elts=1 align=qword
+.decl V48 v_type=G type=uq num_elts=1 align=qword
+.decl V49 v_type=G type=uq num_elts=1 align=qword
+.decl V50 v_type=G type=uq num_elts=1 align=qword
+.decl V51 v_type=G type=uq num_elts=1 align=qword
+.decl V52 v_type=G type=uq num_elts=1 align=qword
+.decl V53 v_type=G type=uq num_elts=1 align=qword
+.decl V54 v_type=G type=uq num_elts=1 align=qword
+.decl V55 v_type=G type=uq num_elts=1 align=qword
+.decl V56 v_type=G type=uq num_elts=1 align=qword
+.decl V57 v_type=G type=uq num_elts=1 align=qword
+.decl V58 v_type=G type=uq num_elts=1 align=qword
+.decl V59 v_type=G type=uq num_elts=1 align=qword
+.decl V60 v_type=G type=d num_elts=1 align=dword
+.decl V61 v_type=G type=d num_elts=1 align=dword
+.decl V62 v_type=G type=d num_elts=1 align=dword
+.decl V63 v_type=G type=q num_elts=1 align=qword
+.decl V64 v_type=G type=q num_elts=1 align=qword
+.decl V65 v_type=G type=q num_elts=1 align=GRF
+.decl V66 v_type=G type=q num_elts=1 align=qword
+.decl V67 v_type=G type=q num_elts=1 align=GRF
+.decl V68 v_type=G type=q num_elts=1 align=GRF
+.decl V69 v_type=G type=uq num_elts=1 align=GRF
+.decl V70 v_type=G type=q num_elts=1 align=GRF
+.decl V71 v_type=G type=q num_elts=1 align=GRF
+.decl V72 v_type=G type=q num_elts=1 align=GRF
+.decl V73 v_type=G type=q num_elts=1 align=GRF
+.decl V74 v_type=G type=q num_elts=1 align=GRF
+.decl V75 v_type=G type=q num_elts=1 align=GRF
+.decl V76 v_type=G type=q num_elts=1 align=GRF
+.decl V77 v_type=G type=q num_elts=1 align=GRF
+.decl V78 v_type=G type=q num_elts=1 align=GRF
+.decl V79 v_type=G type=q num_elts=1 align=GRF
+.decl V80 v_type=G type=q num_elts=1 align=GRF
+.decl V81 v_type=G type=q num_elts=1 align=GRF
+.decl V82 v_type=G type=q num_elts=1 align=GRF
+.decl V83 v_type=G type=q num_elts=1 align=GRF
+.decl V84 v_type=G type=q num_elts=1 align=GRF
+.decl V85 v_type=G type=uq num_elts=1 align=GRF
+.decl V86 v_type=G type=q num_elts=1 align=GRF
+.decl V87 v_type=G type=q num_elts=1 align=GRF
+.decl V88 v_type=G type=q num_elts=1 align=GRF
+.decl V89 v_type=G type=q num_elts=1 align=GRF
+.decl V90 v_type=G type=q num_elts=1 align=GRF
+.decl V91 v_type=G type=q num_elts=1 align=GRF
+.decl V92 v_type=G type=q num_elts=1 align=GRF
+.decl V93 v_type=G type=q num_elts=1 align=GRF
+.decl V94 v_type=G type=q num_elts=1 align=GRF
+.decl V95 v_type=G type=q num_elts=1 align=GRF
+.decl V96 v_type=G type=q num_elts=1 align=GRF
+.decl V97 v_type=G type=q num_elts=1 align=GRF
+.decl V98 v_type=G type=q num_elts=1 align=GRF
+.decl V99 v_type=G type=q num_elts=1 align=GRF
+.decl V100 v_type=G type=d num_elts=1 align=dword
+.decl V101 v_type=G type=q num_elts=1 align=qword
+.decl V102 v_type=G type=q num_elts=1 align=GRF
+.decl V103 v_type=G type=d num_elts=1 align=dword
+.decl V104 v_type=G type=d num_elts=1 align=dword
+.decl V105 v_type=G type=d num_elts=1 align=dword
+.decl V106 v_type=G type=d num_elts=1 align=dword
+.decl V107 v_type=G type=d num_elts=2 align=qword
+.decl V108 v_type=G type=d num_elts=2 align=qword
+.decl V109 v_type=G type=d num_elts=1 align=dword
+.decl V110 v_type=G type=d num_elts=1 align=dword
+.decl V111 v_type=G type=d num_elts=1 align=dword
+.decl V112 v_type=G type=d num_elts=1 align=dword
+.decl V113 v_type=G type=d num_elts=1 align=dword
+.decl V114 v_type=G type=q num_elts=1 align=qword
+.decl V115 v_type=G type=d num_elts=1 align=dword
+.decl V116 v_type=G type=q num_elts=1 align=qword
+.decl V117 v_type=G type=d num_elts=1 align=dword
+.decl V118 v_type=G type=q num_elts=1 align=qword
+.decl V119 v_type=G type=d num_elts=1 align=dword
+.decl V120 v_type=G type=q num_elts=1 align=qword
+.decl V121 v_type=G type=d num_elts=1 align=dword
+.decl V122 v_type=G type=q num_elts=1 align=qword
+.decl V123 v_type=G type=d num_elts=1 align=dword
+.decl V124 v_type=G type=q num_elts=1 align=qword
+.decl V125 v_type=G type=d num_elts=32 align=GRF
+.decl V126 v_type=G type=d num_elts=1 align=dword
+.decl V127 v_type=G type=d num_elts=2 align=qword
+.decl V128 v_type=G type=d num_elts=1 align=dword
+.decl V129 v_type=G type=d num_elts=1 align=dword
+.decl V130 v_type=G type=q num_elts=1 align=GRF
+.decl V131 v_type=G type=q num_elts=1 align=GRF
+.decl V132 v_type=G type=q num_elts=1 align=GRF
+.decl V133 v_type=G type=q num_elts=1 align=GRF
+.decl V134 v_type=G type=q num_elts=1 align=GRF
+.decl V135 v_type=G type=q num_elts=1 align=GRF
+.decl V136 v_type=G type=q num_elts=1 align=GRF
+.decl V137 v_type=G type=q num_elts=1 align=GRF
+.decl V138 v_type=G type=q num_elts=1 align=GRF
+.decl V139 v_type=G type=q num_elts=1 align=GRF
+.decl V140 v_type=G type=q num_elts=1 align=GRF
+.decl V141 v_type=G type=q num_elts=1 align=GRF
+.decl V142 v_type=G type=q num_elts=1 align=GRF
+.decl V143 v_type=G type=q num_elts=1 align=GRF
+.decl V144 v_type=G type=q num_elts=1 align=GRF
+.decl V145 v_type=G type=q num_elts=1 align=GRF
+.decl V146 v_type=G type=q num_elts=1 align=qword
+.decl V147 v_type=G type=q num_elts=1 align=qword
+.decl V148 v_type=G type=q num_elts=1 align=qword
+.decl V149 v_type=G type=q num_elts=1 align=GRF
+.decl V150 v_type=G type=hf num_elts=128 align=GRF
+.decl V151 v_type=G type=w num_elts=4 align=qword
+.decl V152 v_type=G type=w num_elts=1 align=word
+.decl V153 v_type=G type=hf num_elts=2048 align=GRF
+.decl V154 v_type=G type=q num_elts=1 align=GRF
+.decl V155 v_type=G type=d num_elts=1 align=dword
+.decl V156 v_type=G type=q num_elts=1 align=qword
+.decl V157 v_type=G type=q num_elts=1 align=GRF
+.decl V158 v_type=G type=q num_elts=1 align=GRF
+.decl V159 v_type=G type=q num_elts=1 align=GRF
+.decl V160 v_type=G type=q num_elts=1 align=GRF
+.decl V161 v_type=G type=q num_elts=1 align=GRF
+.decl V162 v_type=G type=q num_elts=1 align=GRF
+.decl V163 v_type=G type=q num_elts=1 align=GRF
+.decl V164 v_type=G type=q num_elts=1 align=GRF
+.decl V165 v_type=G type=q num_elts=1 align=GRF
+.decl V166 v_type=G type=q num_elts=1 align=GRF
+.decl V167 v_type=G type=q num_elts=1 align=GRF
+.decl V168 v_type=G type=q num_elts=1 align=GRF
+.decl V169 v_type=G type=q num_elts=1 align=GRF
+.decl V170 v_type=G type=q num_elts=1 align=GRF
+.decl V171 v_type=G type=d num_elts=1 align=dword
+.decl V172 v_type=G type=d num_elts=1 align=dword
+.decl V173 v_type=G type=q num_elts=1 align=GRF
+.decl V174 v_type=G type=q num_elts=1 align=GRF
+.decl V175 v_type=G type=q num_elts=1 align=GRF
+.decl V176 v_type=G type=q num_elts=1 align=GRF
+.decl V177 v_type=G type=q num_elts=1 align=GRF
+.decl V178 v_type=G type=q num_elts=1 align=GRF
+.decl V179 v_type=G type=q num_elts=1 align=GRF
+.decl V180 v_type=G type=q num_elts=1 align=GRF
+.decl V181 v_type=G type=q num_elts=1 align=qword
+.decl V182 v_type=G type=q num_elts=1 align=qword
+.decl V183 v_type=G type=q num_elts=1 align=qword
+.decl V184 v_type=G type=q num_elts=1 align=GRF
+.decl V185 v_type=G type=hf num_elts=128 align=GRF
+.decl V186 v_type=G type=w num_elts=4 align=qword
+.decl V187 v_type=G type=w num_elts=1 align=word
+.decl V188 v_type=G type=hf num_elts=1024 align=GRF
+.decl V189 v_type=G type=q num_elts=1 align=GRF
+.decl V190 v_type=G type=d num_elts=1 align=dword
+.decl V191 v_type=G type=q num_elts=1 align=qword
+.decl V192 v_type=G type=q num_elts=1 align=GRF
+.decl V193 v_type=G type=q num_elts=1 align=GRF
+.decl V194 v_type=G type=q num_elts=1 align=GRF
+.decl V195 v_type=G type=q num_elts=1 align=GRF
+.decl V196 v_type=G type=q num_elts=1 align=GRF
+.decl V197 v_type=G type=q num_elts=1 align=GRF
+.decl V198 v_type=G type=d num_elts=1 align=dword
+.decl V199 v_type=G type=d num_elts=1 align=dword
+.decl V200 v_type=G type=q num_elts=1 align=GRF
+.decl V201 v_type=G type=q num_elts=1 align=GRF
+.decl V202 v_type=G type=q num_elts=1 align=GRF
+.decl V203 v_type=G type=q num_elts=1 align=GRF
+.decl V204 v_type=G type=q num_elts=1 align=GRF
+.decl V205 v_type=G type=q num_elts=1 align=GRF
+.decl V206 v_type=G type=q num_elts=1 align=qword
+.decl V207 v_type=G type=q num_elts=1 align=qword
+.decl V208 v_type=G type=q num_elts=1 align=qword
+.decl V209 v_type=G type=q num_elts=1 align=GRF
+.decl V210 v_type=G type=hf num_elts=128 align=GRF
+.decl V211 v_type=G type=w num_elts=4 align=qword
+.decl V212 v_type=G type=w num_elts=1 align=word
+.decl V213 v_type=G type=hf num_elts=768 align=GRF
+.decl V214 v_type=G type=q num_elts=1 align=GRF
+.decl V215 v_type=G type=d num_elts=1 align=dword
+.decl V216 v_type=G type=q num_elts=1 align=qword
+.decl V217 v_type=G type=q num_elts=1 align=GRF
+.decl V218 v_type=G type=q num_elts=1 align=GRF
+.decl V219 v_type=G type=q num_elts=1 align=GRF
+.decl V220 v_type=G type=q num_elts=1 align=GRF
+.decl V221 v_type=G type=d num_elts=1 align=dword
+.decl V222 v_type=G type=d num_elts=1 align=dword
+.decl V223 v_type=G type=q num_elts=1 align=GRF
+.decl V224 v_type=G type=q num_elts=1 align=GRF
+.decl V225 v_type=G type=q num_elts=1 align=qword
+.decl V226 v_type=G type=q num_elts=1 align=qword
+.decl V227 v_type=G type=q num_elts=1 align=qword
+.decl V228 v_type=G type=q num_elts=1 align=GRF
+.decl V229 v_type=G type=hf num_elts=128 align=GRF
+.decl V230 v_type=G type=w num_elts=4 align=qword
+.decl V231 v_type=G type=w num_elts=1 align=word
+.decl V232 v_type=G type=hf num_elts=256 align=GRF
+.decl V233 v_type=G type=q num_elts=1 align=GRF
+.decl V234 v_type=G type=d num_elts=1 align=dword
+.decl V235 v_type=G type=q num_elts=1 align=qword
+.decl V236 v_type=G type=d num_elts=1 align=dword
+.decl V237 v_type=G type=d num_elts=1 align=dword
+.decl V238 v_type=G type=q num_elts=1 align=GRF
+.decl V239 v_type=G type=q num_elts=1 align=GRF
+.decl V240 v_type=G type=q num_elts=1 align=GRF
+.decl V241 v_type=G type=q num_elts=1 align=GRF
+.decl V242 v_type=G type=q num_elts=1 align=qword
+.decl V243 v_type=G type=q num_elts=1 align=qword
+.decl V244 v_type=G type=q num_elts=1 align=qword
+.decl V245 v_type=G type=q num_elts=1 align=GRF
+.decl V246 v_type=G type=hf num_elts=128 align=GRF
+.decl V247 v_type=G type=w num_elts=4 align=qword
+.decl V248 v_type=G type=w num_elts=1 align=word
+.decl V249 v_type=G type=hf num_elts=512 align=GRF
+.decl V250 v_type=G type=q num_elts=1 align=GRF
+.decl V251 v_type=G type=d num_elts=1 align=dword
+.decl V252 v_type=G type=q num_elts=1 align=qword
+.decl V253 v_type=G type=q num_elts=1 align=GRF
+.decl V254 v_type=G type=q num_elts=1 align=GRF
+.decl V255 v_type=G type=uq num_elts=1 align=GRF
+.decl V256 v_type=G type=hf num_elts=128 align=GRF
+.decl V257 v_type=G type=uq num_elts=1 alias=<V67, 0>
+.decl V258 v_type=G type=uq num_elts=1 alias=<V71, 0>
+.decl V259 v_type=G type=uq num_elts=1 alias=<V73, 0>
+.decl V260 v_type=G type=uq num_elts=1 alias=<V75, 0>
+.decl V261 v_type=G type=uq num_elts=1 alias=<V77, 0>
+.decl V262 v_type=G type=uq num_elts=1 alias=<V79, 0>
+.decl V263 v_type=G type=uq num_elts=1 alias=<V81, 0>
+.decl V264 v_type=G type=uq num_elts=1 alias=<V83, 0>
+.decl V265 v_type=G type=uq num_elts=1 alias=<V87, 0>
+.decl V266 v_type=G type=uq num_elts=1 alias=<V89, 0>
+.decl V267 v_type=G type=uq num_elts=1 alias=<V91, 0>
+.decl V268 v_type=G type=uq num_elts=1 alias=<V93, 0>
+.decl V269 v_type=G type=uq num_elts=1 alias=<V95, 0>
+.decl V270 v_type=G type=uq num_elts=1 alias=<V97, 0>
+.decl V271 v_type=G type=uq num_elts=1 alias=<V99, 0>
+.decl V272 v_type=G type=ud num_elts=1 alias=<V61, 0>
+.decl V273 v_type=G type=ud num_elts=4 alias=<%sr0, 0>
+.decl V274 v_type=G type=ud num_elts=1 alias=<V60, 0>
+.decl V275 v_type=G type=ud num_elts=1 alias=<V62, 0>
+.decl V276 v_type=G type=d num_elts=1 alias=<V62, 0>
+.decl V277 v_type=G type=q num_elts=1 alias=<%sp, 0>
+.decl V278 v_type=G type=q num_elts=1 alias=<V45, 0>
+.decl V279 v_type=G type=q num_elts=1 alias=<%fp, 0>
+.decl V280 v_type=G type=q num_elts=1 alias=<%sp, 0>
+.decl V281 v_type=G type=q num_elts=1 alias=<%sp, 0>
+.decl V282 v_type=G type=q num_elts=1 alias=<%sp, 0>
+.decl V283 v_type=G type=q num_elts=1 alias=<V65, 0>
+.decl V284 v_type=G type=uq num_elts=1 alias=<V65, 0>
+.decl V285 v_type=G type=uq num_elts=1 alias=<V68, 0>
+.decl V286 v_type=G type=q num_elts=1 alias=<V69, 0>
+.decl V287 v_type=G type=uq num_elts=1 alias=<V70, 0>
+.decl V288 v_type=G type=uq num_elts=1 alias=<V72, 0>
+.decl V289 v_type=G type=uq num_elts=1 alias=<V74, 0>
+.decl V290 v_type=G type=uq num_elts=1 alias=<V76, 0>
+.decl V291 v_type=G type=uq num_elts=1 alias=<V78, 0>
+.decl V292 v_type=G type=uq num_elts=1 alias=<V80, 0>
+.decl V293 v_type=G type=uq num_elts=1 alias=<V82, 0>
+.decl V294 v_type=G type=uq num_elts=1 alias=<V84, 0>
+.decl V295 v_type=G type=q num_elts=1 alias=<V85, 0>
+.decl V296 v_type=G type=uq num_elts=1 alias=<V86, 0>
+.decl V297 v_type=G type=uq num_elts=1 alias=<V88, 0>
+.decl V298 v_type=G type=uq num_elts=1 alias=<V90, 0>
+.decl V299 v_type=G type=uq num_elts=1 alias=<V92, 0>
+.decl V300 v_type=G type=uq num_elts=1 alias=<V94, 0>
+.decl V301 v_type=G type=uq num_elts=1 alias=<V96, 0>
+.decl V302 v_type=G type=uq num_elts=1 alias=<V98, 0>
+.decl V303 v_type=G type=d num_elts=1 alias=<V109, 0>
+.decl V304 v_type=G type=d num_elts=3 alias=<V44, 0>
+.decl V305 v_type=G type=d num_elts=1 alias=<V100, 0>
+.decl V306 v_type=G type=uw num_elts=3 alias=<V43, 0>
+.decl V307 v_type=G type=ud num_elts=1 alias=<V39, 0>
+.decl V308 v_type=G type=q num_elts=1 alias=<V101, 0>
+.decl V309 v_type=G type=q num_elts=1 alias=<V102, 0>
+.decl V310 v_type=G type=q num_elts=1 alias=<V68, 0>
+.decl V311 v_type=G type=d num_elts=1 alias=<V103, 0>
+.decl V312 v_type=G type=d num_elts=1 alias=<V42, 0>
+.decl V313 v_type=G type=d num_elts=1 alias=<V41, 0>
+.decl V314 v_type=G type=d num_elts=1 alias=<V32, 0>
+.decl V315 v_type=G type=d num_elts=1 alias=<V104, 0>
+.decl V316 v_type=G type=d num_elts=1 alias=<V34, 0>
+.decl V317 v_type=G type=ud num_elts=1 alias=<V105, 0>
+.decl V318 v_type=G type=ud num_elts=1 alias=<V104, 0>
+.decl V319 v_type=G type=d num_elts=1 alias=<V106, 0>
+.decl V320 v_type=G type=d num_elts=1 alias=<V36, 0>
+.decl V321 v_type=G type=q num_elts=1 alias=<V107, 0>
+.decl V322 v_type=G type=ud num_elts=1 alias=<V33, 0>
+.decl V323 v_type=G type=q num_elts=1 alias=<V108, 0>
+.decl V324 v_type=G type=ud num_elts=1 alias=<V32, 0>
+.decl V325 v_type=G type=d num_elts=1 alias=<V113, 0>
+.decl V326 v_type=G type=d num_elts=1 alias=<V112, 0>
+.decl V327 v_type=G type=d num_elts=1 alias=<V111, 0>
+.decl V328 v_type=G type=d num_elts=1 alias=<V110, 0>
+.decl V329 v_type=G type=ud num_elts=1 alias=<V115, 0>
+.decl V330 v_type=G type=ud num_elts=1 alias=<V109, 0>
+.decl V331 v_type=G type=ud num_elts=1 alias=<V117, 0>
+.decl V332 v_type=G type=ud num_elts=1 alias=<V110, 0>
+.decl V333 v_type=G type=ud num_elts=1 alias=<V119, 0>
+.decl V334 v_type=G type=ud num_elts=1 alias=<V111, 0>
+.decl V335 v_type=G type=ud num_elts=1 alias=<V121, 0>
+.decl V336 v_type=G type=ud num_elts=1 alias=<V112, 0>
+.decl V337 v_type=G type=ud num_elts=1 alias=<V123, 0>
+.decl V338 v_type=G type=ud num_elts=1 alias=<V113, 0>
+.decl V339 v_type=G type=ud num_elts=32 alias=<V125, 0>
+.decl V340 v_type=G type=ud num_elts=2 alias=<V114, 0>
+.decl V341 v_type=G type=d num_elts=1 alias=<V126, 0>
+.decl V342 v_type=G type=d num_elts=2 alias=<V114, 0>
+.decl V343 v_type=G type=d num_elts=2 alias=<V127, 0>
+.decl V344 v_type=G type=d num_elts=32 alias=<V125, 0>
+.decl V345 v_type=G type=q num_elts=1 alias=<V127, 0>
+.decl V346 v_type=G type=ud num_elts=1 alias=<V100, 0>
+.decl V347 v_type=G type=ud num_elts=2 alias=<V127, 0>
+.decl V348 v_type=G type=ud num_elts=2 alias=<V107, 0>
+.decl V349 v_type=G type=d num_elts=2 alias=<V107, 0>
+.decl V350 v_type=G type=d num_elts=1 alias=<V105, 0>
+.decl V351 v_type=G type=d num_elts=1 alias=<V128, 0>
+.decl V352 v_type=G type=d num_elts=1 alias=<V37, 0>
+.decl V353 v_type=G type=d num_elts=1 alias=<V129, 0>
+.decl V354 v_type=G type=ud num_elts=1 alias=<V128, 0>
+.decl V355 v_type=G type=ud num_elts=1 alias=<V129, 0>
+.decl V356 v_type=G type=ud num_elts=1 alias=<V36, 0>
+.decl V357 v_type=G type=q num_elts=1 alias=<V146, 0>
+.decl V358 v_type=G type=q num_elts=1 alias=<V130, 0>
+.decl V359 v_type=G type=q num_elts=1 alias=<V67, 0>
+.decl V360 v_type=G type=d num_elts=1024 alias=<V153, 0>
+.decl V361 v_type=G type=uq num_elts=1 alias=<V130, 0>
+.decl V362 v_type=G type=uq num_elts=1 alias=<V131, 0>
+.decl V363 v_type=G type=uq num_elts=1 alias=<V132, 0>
+.decl V364 v_type=G type=uq num_elts=1 alias=<V133, 0>
+.decl V365 v_type=G type=uq num_elts=1 alias=<V134, 0>
+.decl V366 v_type=G type=uq num_elts=1 alias=<V135, 0>
+.decl V367 v_type=G type=uq num_elts=1 alias=<V136, 0>
+.decl V368 v_type=G type=uq num_elts=1 alias=<V137, 0>
+.decl V369 v_type=G type=uq num_elts=1 alias=<V138, 0>
+.decl V370 v_type=G type=uq num_elts=1 alias=<V139, 0>
+.decl V371 v_type=G type=uq num_elts=1 alias=<V140, 0>
+.decl V372 v_type=G type=uq num_elts=1 alias=<V141, 0>
+.decl V373 v_type=G type=uq num_elts=1 alias=<V142, 0>
+.decl V374 v_type=G type=uq num_elts=1 alias=<V143, 0>
+.decl V375 v_type=G type=uq num_elts=1 alias=<V144, 0>
+.decl V376 v_type=G type=uq num_elts=1 alias=<V145, 0>
+.decl V377 v_type=G type=q num_elts=1 alias=<V151, 0>
+.decl V378 v_type=G type=q num_elts=1 alias=<V147, 0>
+.decl V379 v_type=G type=q num_elts=1 alias=<V148, 0>
+.decl V380 v_type=G type=q num_elts=1 alias=<V149, 0>
+.decl V381 v_type=G type=d num_elts=64 alias=<V150, 0>
+.decl V382 v_type=G type=uq num_elts=1 alias=<V149, 0>
+.decl V383 v_type=G type=w num_elts=1 alias=<V152, 0>
+.decl V384 v_type=G type=w num_elts=4 alias=<V151, 0>
+.decl V385 v_type=G type=uw num_elts=1 alias=<V152, 0>
+.decl V386 v_type=G type=d num_elts=2 alias=<V147, 0>
+.decl V387 v_type=G type=d num_elts=2 alias=<V124, 0>
+.decl V388 v_type=G type=uq num_elts=1 alias=<V102, 0>
+.decl V389 v_type=G type=d num_elts=1 alias=<V155, 0>
+.decl V390 v_type=G type=ud num_elts=1 alias=<V155, 0>
+.decl V391 v_type=G type=q num_elts=1 alias=<V156, 0>
+.decl V392 v_type=G type=q num_elts=1 alias=<V255, 0>
+.decl V393 v_type=G type=q num_elts=1 alias=<V154, 0>
+.decl V394 v_type=G type=uq num_elts=1 alias=<V255, 0>
+.decl V395 v_type=G type=uq num_elts=1 alias=<V157, 0>
+.decl V396 v_type=G type=uq num_elts=1 alias=<V158, 0>
+.decl V397 v_type=G type=uq num_elts=1 alias=<V159, 0>
+.decl V398 v_type=G type=uq num_elts=1 alias=<V160, 0>
+.decl V399 v_type=G type=uq num_elts=1 alias=<V161, 0>
+.decl V400 v_type=G type=uq num_elts=1 alias=<V162, 0>
+.decl V401 v_type=G type=uq num_elts=1 alias=<V163, 0>
+.decl V402 v_type=G type=uq num_elts=1 alias=<V164, 0>
+.decl V403 v_type=G type=uq num_elts=1 alias=<V165, 0>
+.decl V404 v_type=G type=uq num_elts=1 alias=<V166, 0>
+.decl V405 v_type=G type=uq num_elts=1 alias=<V167, 0>
+.decl V406 v_type=G type=uq num_elts=1 alias=<V168, 0>
+.decl V407 v_type=G type=uq num_elts=1 alias=<V169, 0>
+.decl V408 v_type=G type=uq num_elts=1 alias=<V170, 0>
+.decl V409 v_type=G type=d num_elts=1 alias=<V171, 0>
+.decl V410 v_type=G type=d num_elts=1 alias=<V172, 0>
+.decl V411 v_type=G type=ud num_elts=1 alias=<V171, 0>
+.decl V412 v_type=G type=ud num_elts=1 alias=<V172, 0>
+.decl V413 v_type=G type=q num_elts=1 alias=<V181, 0>
+.decl V414 v_type=G type=q num_elts=1 alias=<V173, 0>
+.decl V415 v_type=G type=d num_elts=512 alias=<V188, 0>
+.decl V416 v_type=G type=uq num_elts=1 alias=<V173, 0>
+.decl V417 v_type=G type=uq num_elts=1 alias=<V174, 0>
+.decl V418 v_type=G type=uq num_elts=1 alias=<V175, 0>
+.decl V419 v_type=G type=uq num_elts=1 alias=<V176, 0>
+.decl V420 v_type=G type=uq num_elts=1 alias=<V177, 0>
+.decl V421 v_type=G type=uq num_elts=1 alias=<V178, 0>
+.decl V422 v_type=G type=uq num_elts=1 alias=<V179, 0>
+.decl V423 v_type=G type=uq num_elts=1 alias=<V180, 0>
+.decl V424 v_type=G type=q num_elts=1 alias=<V186, 0>
+.decl V425 v_type=G type=q num_elts=1 alias=<V182, 0>
+.decl V426 v_type=G type=q num_elts=1 alias=<V183, 0>
+.decl V427 v_type=G type=q num_elts=1 alias=<V184, 0>
+.decl V428 v_type=G type=d num_elts=64 alias=<V185, 0>
+.decl V429 v_type=G type=uq num_elts=1 alias=<V184, 0>
+.decl V430 v_type=G type=w num_elts=1 alias=<V187, 0>
+.decl V431 v_type=G type=w num_elts=4 alias=<V186, 0>
+.decl V432 v_type=G type=uw num_elts=1 alias=<V187, 0>
+.decl V433 v_type=G type=d num_elts=2 alias=<V182, 0>
+.decl V434 v_type=G type=d num_elts=2 alias=<V122, 0>
+.decl V435 v_type=G type=d num_elts=1 alias=<V190, 0>
+.decl V436 v_type=G type=ud num_elts=1 alias=<V190, 0>
+.decl V437 v_type=G type=q num_elts=1 alias=<V191, 0>
+.decl V438 v_type=G type=q num_elts=1 alias=<V189, 0>
+.decl V439 v_type=G type=uq num_elts=1 alias=<V192, 0>
+.decl V440 v_type=G type=uq num_elts=1 alias=<V193, 0>
+.decl V441 v_type=G type=uq num_elts=1 alias=<V194, 0>
+.decl V442 v_type=G type=uq num_elts=1 alias=<V195, 0>
+.decl V443 v_type=G type=uq num_elts=1 alias=<V196, 0>
+.decl V444 v_type=G type=uq num_elts=1 alias=<V197, 0>
+.decl V445 v_type=G type=d num_elts=1 alias=<V198, 0>
+.decl V446 v_type=G type=d num_elts=1 alias=<V199, 0>
+.decl V447 v_type=G type=ud num_elts=1 alias=<V198, 0>
+.decl V448 v_type=G type=ud num_elts=1 alias=<V199, 0>
+.decl V449 v_type=G type=q num_elts=1 alias=<V206, 0>
+.decl V450 v_type=G type=q num_elts=1 alias=<V200, 0>
+.decl V451 v_type=G type=d num_elts=384 alias=<V213, 0>
+.decl V452 v_type=G type=uq num_elts=1 alias=<V200, 0>
+.decl V453 v_type=G type=uq num_elts=1 alias=<V201, 0>
+.decl V454 v_type=G type=uq num_elts=1 alias=<V202, 0>
+.decl V455 v_type=G type=uq num_elts=1 alias=<V203, 0>
+.decl V456 v_type=G type=uq num_elts=1 alias=<V204, 0>
+.decl V457 v_type=G type=uq num_elts=1 alias=<V205, 0>
+.decl V458 v_type=G type=q num_elts=1 alias=<V211, 0>
+.decl V459 v_type=G type=q num_elts=1 alias=<V207, 0>
+.decl V460 v_type=G type=q num_elts=1 alias=<V208, 0>
+.decl V461 v_type=G type=q num_elts=1 alias=<V209, 0>
+.decl V462 v_type=G type=d num_elts=64 alias=<V210, 0>
+.decl V463 v_type=G type=uq num_elts=1 alias=<V209, 0>
+.decl V464 v_type=G type=w num_elts=1 alias=<V212, 0>
+.decl V465 v_type=G type=w num_elts=4 alias=<V211, 0>
+.decl V466 v_type=G type=uw num_elts=1 alias=<V212, 0>
+.decl V467 v_type=G type=d num_elts=2 alias=<V207, 0>
+.decl V468 v_type=G type=d num_elts=2 alias=<V120, 0>
+.decl V469 v_type=G type=d num_elts=1 alias=<V215, 0>
+.decl V470 v_type=G type=ud num_elts=1 alias=<V215, 0>
+.decl V471 v_type=G type=q num_elts=1 alias=<V216, 0>
+.decl V472 v_type=G type=q num_elts=1 alias=<V214, 0>
+.decl V473 v_type=G type=uq num_elts=1 alias=<V217, 0>
+.decl V474 v_type=G type=uq num_elts=1 alias=<V218, 0>
+.decl V475 v_type=G type=uq num_elts=1 alias=<V219, 0>
+.decl V476 v_type=G type=uq num_elts=1 alias=<V220, 0>
+.decl V477 v_type=G type=d num_elts=1 alias=<V221, 0>
+.decl V478 v_type=G type=d num_elts=1 alias=<V222, 0>
+.decl V479 v_type=G type=ud num_elts=1 alias=<V221, 0>
+.decl V480 v_type=G type=ud num_elts=1 alias=<V222, 0>
+.decl V481 v_type=G type=q num_elts=1 alias=<V225, 0>
+.decl V482 v_type=G type=q num_elts=1 alias=<V223, 0>
+.decl V483 v_type=G type=d num_elts=128 alias=<V232, 0>
+.decl V484 v_type=G type=uq num_elts=1 alias=<V223, 0>
+.decl V485 v_type=G type=uq num_elts=1 alias=<V224, 0>
+.decl V486 v_type=G type=q num_elts=1 alias=<V230, 0>
+.decl V487 v_type=G type=q num_elts=1 alias=<V226, 0>
+.decl V488 v_type=G type=q num_elts=1 alias=<V227, 0>
+.decl V489 v_type=G type=q num_elts=1 alias=<V228, 0>
+.decl V490 v_type=G type=d num_elts=64 alias=<V229, 0>
+.decl V491 v_type=G type=uq num_elts=1 alias=<V228, 0>
+.decl V492 v_type=G type=w num_elts=1 alias=<V231, 0>
+.decl V493 v_type=G type=w num_elts=4 alias=<V230, 0>
+.decl V494 v_type=G type=uw num_elts=1 alias=<V231, 0>
+.decl V495 v_type=G type=d num_elts=2 alias=<V226, 0>
+.decl V496 v_type=G type=d num_elts=2 alias=<V116, 0>
+.decl V497 v_type=G type=d num_elts=1 alias=<V234, 0>
+.decl V498 v_type=G type=ud num_elts=1 alias=<V234, 0>
+.decl V499 v_type=G type=q num_elts=1 alias=<V235, 0>
+.decl V500 v_type=G type=q num_elts=1 alias=<V233, 0>
+.decl V501 v_type=G type=d num_elts=1 alias=<V236, 0>
+.decl V502 v_type=G type=d num_elts=1 alias=<V237, 0>
+.decl V503 v_type=G type=ud num_elts=1 alias=<V236, 0>
+.decl V504 v_type=G type=ud num_elts=1 alias=<V237, 0>
+.decl V505 v_type=G type=q num_elts=1 alias=<V242, 0>
+.decl V506 v_type=G type=q num_elts=1 alias=<V238, 0>
+.decl V507 v_type=G type=d num_elts=256 alias=<V249, 0>
+.decl V508 v_type=G type=uq num_elts=1 alias=<V238, 0>
+.decl V509 v_type=G type=uq num_elts=1 alias=<V239, 0>
+.decl V510 v_type=G type=uq num_elts=1 alias=<V240, 0>
+.decl V511 v_type=G type=uq num_elts=1 alias=<V241, 0>
+.decl V512 v_type=G type=q num_elts=1 alias=<V247, 0>
+.decl V513 v_type=G type=q num_elts=1 alias=<V243, 0>
+.decl V514 v_type=G type=q num_elts=1 alias=<V244, 0>
+.decl V515 v_type=G type=q num_elts=1 alias=<V245, 0>
+.decl V516 v_type=G type=d num_elts=64 alias=<V246, 0>
+.decl V517 v_type=G type=uq num_elts=1 alias=<V245, 0>
+.decl V518 v_type=G type=w num_elts=1 alias=<V248, 0>
+.decl V519 v_type=G type=w num_elts=4 alias=<V247, 0>
+.decl V520 v_type=G type=uw num_elts=1 alias=<V248, 0>
+.decl V521 v_type=G type=d num_elts=2 alias=<V243, 0>
+.decl V522 v_type=G type=d num_elts=2 alias=<V118, 0>
+.decl V523 v_type=G type=d num_elts=1 alias=<V251, 0>
+.decl V524 v_type=G type=ud num_elts=1 alias=<V251, 0>
+.decl V525 v_type=G type=q num_elts=1 alias=<V252, 0>
+.decl V526 v_type=G type=q num_elts=1 alias=<V250, 0>
+.decl V527 v_type=G type=uq num_elts=1 alias=<V253, 0>
+.decl V528 v_type=G type=uq num_elts=1 alias=<V254, 0>
+.decl V529 v_type=G type=d num_elts=64 alias=<V256, 0>
+.decl V530 v_type=G type=q num_elts=1 alias=<V114, 0>
+.decl V531 v_type=G type=d num_elts=2 alias=<V108, 0>
+.decl A0 v_type=A num_elts=1
+.decl A1 v_type=A num_elts=1
+.decl A2 v_type=A num_elts=1
+.decl A3 v_type=A num_elts=1
+.decl A4 v_type=A num_elts=1
+.decl P1 v_type=P num_elts=1
+.decl P2 v_type=P num_elts=1
+.decl P3 v_type=P num_elts=1
+.decl P4 v_type=P num_elts=1
+.decl P5 v_type=P num_elts=1
+.decl P6 v_type=P num_elts=1
+.decl P7 v_type=P num_elts=1
+.decl P8 v_type=P num_elts=1
+.decl P9 v_type=P num_elts=1
+.decl P10 v_type=P num_elts=1
+.decl P11 v_type=P num_elts=1
+.decl P12 v_type=P num_elts=1
+.decl P13 v_type=P num_elts=1
+.decl P14 v_type=P num_elts=1
+.decl P15 v_type=P num_elts=1
+.decl P16 v_type=P num_elts=1
+.decl P17 v_type=P num_elts=1
+.decl P18 v_type=P num_elts=1
+.decl P19 v_type=P num_elts=1
+.decl P20 v_type=P num_elts=1
+.decl P21 v_type=P num_elts=1
+.decl P22 v_type=P num_elts=1
+.decl P23 v_type=P num_elts=1
+.decl P24 v_type=P num_elts=1
+.decl P25 v_type=P num_elts=1
+.decl P26 v_type=P num_elts=1
+.decl P27 v_type=P num_elts=1
+.decl P28 v_type=P num_elts=1
+.decl P29 v_type=P num_elts=1
+.decl P30 v_type=P num_elts=1
+.decl P31 v_type=P num_elts=1
+.decl P32 v_type=P num_elts=1
+.decl P33 v_type=P num_elts=1
+.decl P34 v_type=P num_elts=1
+.decl P35 v_type=P num_elts=1
+.decl P36 v_type=P num_elts=1
+.decl P37 v_type=P num_elts=1
+.decl P38 v_type=P num_elts=1
+.decl P39 v_type=P num_elts=1
+.decl P40 v_type=P num_elts=1
+.decl P41 v_type=P num_elts=1
+.input V32 offset=152 size=4
+.input V33 offset=156 size=4
+.input V34 offset=160 size=4
+.input V35 offset=168 size=8
+.input V36 offset=176 size=4
+.input V37 offset=180 size=4
+.input V39 offset=384 size=4
+.input V40 offset=388 size=4
+.input V41 offset=392 size=4
+.input V42 offset=396 size=4
+.implicit_LOCAL_ID V43 offset=64 size=6
+.implicit_LOCAL_SIZE V44 offset=128 size=12
+.implicit_UNDEFINED_12 V45 offset=144 size=8
+.implicit_UNDEFINED_13 V69 offset=256 size=8
+.implicit_UNDEFINED_13 V46 offset=264 size=8
+.implicit_UNDEFINED_13 V47 offset=272 size=8
+.implicit_UNDEFINED_13 V48 offset=280 size=8
+.implicit_UNDEFINED_13 V49 offset=288 size=8
+.implicit_UNDEFINED_13 V50 offset=296 size=8
+.implicit_UNDEFINED_13 V51 offset=304 size=8
+.implicit_UNDEFINED_13 V52 offset=312 size=8
+.implicit_UNDEFINED_13 V85 offset=320 size=8
+.implicit_UNDEFINED_13 V53 offset=328 size=8
+.implicit_UNDEFINED_13 V54 offset=336 size=8
+.implicit_UNDEFINED_13 V55 offset=344 size=8
+.implicit_UNDEFINED_13 V56 offset=352 size=8
+.implicit_UNDEFINED_13 V57 offset=360 size=8
+.implicit_UNDEFINED_13 V58 offset=368 size=8
+.implicit_UNDEFINED_13 V59 offset=376 size=8
+.kernel_attr SLMSize=0
+.kernel_attr PerThreadInputSize=64
+.kernel_attr NBarrierCnt=0
+.kernel_attr Target="cm"
+.kernel_attr SimdSize=32
+.kernel_attr NoBarrier    
+
+.function "_ZTSZZN10allreducerIN4sycl3_V16detail9half_impl4halfELj16ELj1024EE9allreduceERNS1_5queueEPvjiPfENKUlRNS1_7handlerEE_clESB_E32Kernel_load_input_to_temp_buffer_BB_0"
+_ZTSZZN10allreducerIN4sycl3_V16detail9half_impl4halfELj16ELj1024EE9allreduceERNS1_5queueEPvjiPfENKUlRNS1_7handlerEE_clESB_E32Kernel_load_input_to_temp_buffer_BB_0:
+    mov (M1, 1) V257(0,0)<1> V35(0,0)<0;1,0>                                     /// $1
+    mov (M1, 1) V258(0,0)<1> V46(0,0)<0;1,0>                                     /// $2
+    mov (M1, 1) V259(0,0)<1> V47(0,0)<0;1,0>                                     /// $3
+    mov (M1, 1) V260(0,0)<1> V48(0,0)<0;1,0>                                     /// $4
+    mov (M1, 1) V261(0,0)<1> V49(0,0)<0;1,0>                                     /// $5
+    mov (M1, 1) V262(0,0)<1> V50(0,0)<0;1,0>                                     /// $6
+    mov (M1, 1) V263(0,0)<1> V51(0,0)<0;1,0>                                     /// $7
+    mov (M1, 1) V264(0,0)<1> V52(0,0)<0;1,0>                                     /// $8
+    mov (M1, 1) V265(0,0)<1> V53(0,0)<0;1,0>                                     /// $9
+    mov (M1, 1) V266(0,0)<1> V54(0,0)<0;1,0>                                     /// $10
+    mov (M1, 1) V267(0,0)<1> V55(0,0)<0;1,0>                                     /// $11
+    mov (M1, 1) V268(0,0)<1> V56(0,0)<0;1,0>                                     /// $12
+    mov (M1, 1) V269(0,0)<1> V57(0,0)<0;1,0>                                     /// $13
+    mov (M1, 1) V270(0,0)<1> V58(0,0)<0;1,0>                                     /// $14
+    mov (M1, 1) V271(0,0)<1> V59(0,0)<0;1,0>                                     /// $15
+    shr (M1, 1) V272(0,0)<1> V273(0,0)<0;1,0> 0x2:ud                             /// $16
+    and (M1, 1) V274(0,0)<1> V273(0,0)<0;1,0> 0x3f:ud                            /// $17
+    bfn.xf8 (M1, 1) V272(0,0)<1> V272(0,0)<0;1,0> 0xffffffc0:ud V274(0,0)<0;1,0> /// $18
+    shr (M1, 1) V275(0,0)<1> V272(0,0)<0;1,0> 0x1:ud                             /// $19
+    and (M1, 1) V272(0,0)<1> V272(0,0)<0;1,0> 0x7:ud                             /// $20
+    bfn.xf8 (M1, 1) V275(0,0)<1> V275(0,0)<0;1,0> 0xfffffff8:ud V272(0,0)<0;1,0> /// $21
+    and (M1, 1) V275(0,0)<1> V275(0,0)<0;1,0> 0xfff:ud                           /// $22
+    mul (M1, 1) V276(0,0)<1> V276(0,0)<0;1,0> 0x90:d                             /// $23
+    add (M1, 1) V277(0,0)<1> V275(0,0)<0;1,0> V278(0,0)<0;1,0>                   /// $24
+    mov (M1, 1) V279(0,0)<1> V280(0,0)<0;1,0>                                    /// $25
+    mov (M1, 1) V65(0,0)<1> V281(0,0)<0;1,0>                                     /// $26
+    add (M1, 1) V282(0,0)<1> V283(0,0)<0;1,0> 0x90:q                             /// $27
+    lsc_store.ugm (M1, 1)  flat[V284]:a64  V67:d64                               /// $28
+    add (M1, 1) V285(0,0)<1> V284(0,0)<0;1,0> 0x8:uq                             /// $29
+    lsc_store.ugm (M1, 1)  flat[V285]:a64  V286:d64                              /// $30
+    add (M1, 1) V287(0,0)<1> V285(0,0)<0;1,0> 0x8:uq                             /// $31
+    lsc_store.ugm (M1, 1)  flat[V287]:a64  V71:d64                               /// $32
+    add (M1, 1) V288(0,0)<1> V285(0,0)<0;1,0> 0x10:uq                            /// $33
+    lsc_store.ugm (M1, 1)  flat[V288]:a64  V73:d64                               /// $34
+    add (M1, 1) V289(0,0)<1> V285(0,0)<0;1,0> 0x18:uq                            /// $35
+    lsc_store.ugm (M1, 1)  flat[V289]:a64  V75:d64                               /// $36
+    add (M1, 1) V290(0,0)<1> V285(0,0)<0;1,0> 0x20:uq                            /// $37
+    lsc_store.ugm (M1, 1)  flat[V290]:a64  V77:d64                               /// $38
+    add (M1, 1) V291(0,0)<1> V285(0,0)<0;1,0> 0x28:uq                            /// $39
+    lsc_store.ugm (M1, 1)  flat[V291]:a64  V79:d64                               /// $40
+    add (M1, 1) V292(0,0)<1> V285(0,0)<0;1,0> 0x30:uq                            /// $41
+    lsc_store.ugm (M1, 1)  flat[V292]:a64  V81:d64                               /// $42
+    add (M1, 1) V293(0,0)<1> V285(0,0)<0;1,0> 0x38:uq                            /// $43
+    lsc_store.ugm (M1, 1)  flat[V293]:a64  V83:d64                               /// $44
+    add (M1, 1) V294(0,0)<1> V285(0,0)<0;1,0> 0x40:uq                            /// $45
+    lsc_store.ugm (M1, 1)  flat[V294]:a64  V295:d64                              /// $46
+    add (M1, 1) V296(0,0)<1> V285(0,0)<0;1,0> 0x48:uq                            /// $47
+    lsc_store.ugm (M1, 1)  flat[V296]:a64  V87:d64                               /// $48
+    add (M1, 1) V297(0,0)<1> V285(0,0)<0;1,0> 0x50:uq                            /// $49
+    lsc_store.ugm (M1, 1)  flat[V297]:a64  V89:d64                               /// $50
+    add (M1, 1) V298(0,0)<1> V285(0,0)<0;1,0> 0x58:uq                            /// $51
+    lsc_store.ugm (M1, 1)  flat[V298]:a64  V91:d64                               /// $52
+    add (M1, 1) V299(0,0)<1> V285(0,0)<0;1,0> 0x60:uq                            /// $53
+    lsc_store.ugm (M1, 1)  flat[V299]:a64  V93:d64                               /// $54
+    add (M1, 1) V300(0,0)<1> V285(0,0)<0;1,0> 0x68:uq                            /// $55
+    lsc_store.ugm (M1, 1)  flat[V300]:a64  V95:d64                               /// $56
+    add (M1, 1) V301(0,0)<1> V285(0,0)<0;1,0> 0x70:uq                            /// $57
+    lsc_store.ugm (M1, 1)  flat[V301]:a64  V97:d64                               /// $58
+    add (M1, 1) V302(0,0)<1> V285(0,0)<0;1,0> 0x78:uq                            /// $59
+    lsc_store.ugm (M1, 1)  flat[V302]:a64  V99:d64                               /// $60
+    mov (M1, 1) V109(0,0)<1> %group_id_x(0,0)<0;1,0>                             /// $61
+    mul (M1, 1) V303(0,0)<1> V303(0,0)<0;1,0> V304(0,0)<0;1,0>                   /// $62
+    add (M1, 1) V305(0,0)<1> V303(0,0)<0;1,0> V306(0,0)<0;1,0>                   /// $63
+    mov (M1, 1) V101(0,0)<1> V307(0,0)<0;1,0>                                    /// $64
+    shl (M1, 1) V308(0,0)<1> V308(0,0)<0;1,0> 0x3:q                              /// $65
+    add (M1, 1) V309(0,0)<1> V310(0,0)<0;1,0> V308(0,0)<0;1,0>                   /// $66
+    mul (M1, 1) V311(0,0)<1> V312(0,0)<0;1,0> V313(0,0)<0;1,0>                   /// $67
+    cmp.gt (M1, 1) P1 V314(0,0)<0;1,0> 0x0:d                                     /// $68
+    (!P1) jmp (M1, 1) BB_1                                                       /// $69
+    add (M1, 1) V315(0,0)<1> V316(0,0)<0;1,0> 0xfffffffe:d                       /// $70
+    rol (M1, 1) V317(0,0)<1> V318(0,0)<0;1,0> 0x1f:ud                            /// $71
+    add (M1, 1) V319(0,0)<1> V320(0,0)<0;1,0> 0x7f:d                             /// $72
+    mov (M1, 1) V321(0,0)<1> V322(0,0)<0;1,0>                                    /// $73
+    mov (M1, 1) V323(0,0)<1> V324(0,0)<0;1,0>                                    /// $74
+    add3 (M1, 1) V109(0,0)<1> V109(0,0)<0;1,0> V37(0,0)<0;1,0> V306(0,0)<0;1,0>  /// $75
+    mul (M1, 1) V325(0,0)<1> V303(0,0)<0;1,0> 0xfffff800:d                       /// $76
+    add (M1, 1) V325(0,0)<1> V325(0,0)<0;1,0> V319(0,0)<0;1,0>                   /// $77
+    mul (M1, 1) V326(0,0)<1> V303(0,0)<0;1,0> 0xfffffc00:d                       /// $78
+    add (M1, 1) V326(0,0)<1> V326(0,0)<0;1,0> V319(0,0)<0;1,0>                   /// $79
+    mul (M1, 1) V327(0,0)<1> V303(0,0)<0;1,0> 0xfffffd00:d                       /// $80
+    add (M1, 1) V327(0,0)<1> V327(0,0)<0;1,0> V319(0,0)<0;1,0>                   /// $81
+    mul (M1, 1) V328(0,0)<1> V303(0,0)<0;1,0> 0xfffffe00:d                       /// $82
+    add (M1, 1) V328(0,0)<1> V328(0,0)<0;1,0> V319(0,0)<0;1,0>                   /// $83
+    mul (M1, 1) V303(0,0)<1> V303(0,0)<0;1,0> 0xffffff00:d                       /// $84
+    add (M1, 1) V303(0,0)<1> V303(0,0)<0;1,0> V319(0,0)<0;1,0>                   /// $85
+    mov (M1, 1) V114(0,0)<1> 0x0:q                                               /// $86
+
+BB_2:
+    shr (M1, 1) V329(0,0)<1> V330(0,0)<0;1,0> 0x7:ud                             /// $88
+    max (M1, 1) V329(0,0)<1> V329(0,0)<0;1,0> 0x1:ud                             /// $89
+    mov (M1, 1) V116(0,0)<1> V329(0,0)<0;1,0>                                    /// $90
+    shr (M1, 1) V331(0,0)<1> V332(0,0)<0;1,0> 0x7:ud                             /// $91
+    max (M1, 1) V331(0,0)<1> V331(0,0)<0;1,0> 0x1:ud                             /// $92
+    mov (M1, 1) V118(0,0)<1> V331(0,0)<0;1,0>                                    /// $93
+    shr (M1, 1) V333(0,0)<1> V334(0,0)<0;1,0> 0x7:ud                             /// $94
+    max (M1, 1) V333(0,0)<1> V333(0,0)<0;1,0> 0x1:ud                             /// $95
+    mov (M1, 1) V120(0,0)<1> V333(0,0)<0;1,0>                                    /// $96
+    shr (M1, 1) V335(0,0)<1> V336(0,0)<0;1,0> 0x7:ud                             /// $97
+    max (M1, 1) V335(0,0)<1> V335(0,0)<0;1,0> 0x1:ud                             /// $98
+    mov (M1, 1) V122(0,0)<1> V335(0,0)<0;1,0>                                    /// $99
+    shr (M1, 1) V337(0,0)<1> V338(0,0)<0;1,0> 0x7:ud                             /// $100
+    max (M1, 1) V337(0,0)<1> V337(0,0)<0;1,0> 0x1:ud                             /// $101
+    mov (M1, 1) V124(0,0)<1> V337(0,0)<0;1,0>                                    /// $102
+    madw (M1, 1) V339(0,0)<1> V340(0,0)<0;1,0> 0xe00:ud 0x0:ud                   /// $103
+    mul (M1, 1) V341(0,0)<1> V342(0,1)<0;1,0> 0xe00:d                            /// $104
+    mov (M1, 1) V127(0,0)<1> V125(0,0)<0;1,0>                                    /// $105
+    add (M1, 1) V343(0,1)<1> V341(0,0)<0;1,0> V344(1,0)<0;1,0>                   /// $106
+    add (M1, 1) V345(0,0)<1> V345(0,0)<0;1,0> V346(0,0)<0;1,0>                   /// $107
+    cmp.lt (M1, 1) P2 V347(0,1)<0;1,0> V348(0,1)<0;1,0>                          /// $108
+    cmp.lt (M1, 1) P3 V347(0,0)<0;1,0> V348(0,0)<0;1,0>                          /// $109
+    cmp.eq (M1, 1) P4 V343(0,1)<0;1,0> V349(0,1)<0;1,0>                          /// $110
+    and (M1, 1) P5 P4 P3                                                         /// $111
+    or (M1, 1) P6 P5 P2                                                          /// $112
+    (!P6) jmp (M1, 1) BB_1                                                       /// $113
+    cmp.lt (M1, 1) P7 V350(0,0)<0;1,0> 0x2:d                                     /// $114
+    (P7) jmp (M1, 1) BB_3                                                        /// $115
+    cmp.eq (M1, 1) P8 V315(0,0)<0;1,0> 0x4:d                                     /// $116
+    (P8) jmp (M1, 1) BB_4                                                        /// $117
+    cmp.lt (M1, 1) P9 V350(0,0)<0;1,0> 0x7:d                                     /// $118
+    (P9) jmp (M1, 1) BB_5                                                        /// $119
+    cmp.eq (M1, 1) P10 V315(0,0)<0;1,0> 0xe:d                                    /// $120
+    (!P10) jmp (M1, 1) BB_6                                                      /// $121
+    add (M1, 1) V351(0,0)<1> V343(0,0)<0;1,0> V352(0,0)<0;1,0>                   /// $122
+    shl (M1, 1) V351(0,0)<1> V351(0,0)<0;1,0> 0xb:d                              /// $123
+    add (M1, 1) V353(0,0)<1> V351(0,0)<0;1,0> 0x800:d                            /// $124
+    mov (M1, 1) V146(0,0)<1> V354(0,0)<0;1,0>                                    /// $125
+    cmp.gt (M1, 1) P11 V355(0,0)<0;1,0> V356(0,0)<0;1,0>                         /// $126
+    (P11) jmp (M1, 1) BB_7                                                       /// $127
+    shl (M1, 1) V357(0,0)<1> V357(0,0)<0;1,0> 0x1:q                              /// $128
+    add (M1, 1) V358(0,0)<1> V359(0,0)<0;1,0> V357(0,0)<0;1,0>                   /// $129
+    lsc_load.ugm (M1, 1)  V360:d32x64t  flat[V361]:a64                           /// $130
+    add (M1, 1) V362(0,0)<1> V361(0,0)<0;1,0> 0x100:uq                           /// $131
+    lsc_load.ugm (M1, 1)  V360.256:d32x64t  flat[V362]:a64                       /// $132
+    add (M1, 1) V363(0,0)<1> V361(0,0)<0;1,0> 0x200:uq                           /// $133
+    lsc_load.ugm (M1, 1)  V360.512:d32x64t  flat[V363]:a64                       /// $134
+    add (M1, 1) V364(0,0)<1> V361(0,0)<0;1,0> 0x300:uq                           /// $135
+    lsc_load.ugm (M1, 1)  V360.768:d32x64t  flat[V364]:a64                       /// $136
+    add (M1, 1) V365(0,0)<1> V361(0,0)<0;1,0> 0x400:uq                           /// $137
+    lsc_load.ugm (M1, 1)  V360.1024:d32x64t  flat[V365]:a64                      /// $138
+    add (M1, 1) V366(0,0)<1> V361(0,0)<0;1,0> 0x500:uq                           /// $139
+    lsc_load.ugm (M1, 1)  V360.1280:d32x64t  flat[V366]:a64                      /// $140
+    add (M1, 1) V367(0,0)<1> V361(0,0)<0;1,0> 0x600:uq                           /// $141
+    lsc_load.ugm (M1, 1)  V360.1536:d32x64t  flat[V367]:a64                      /// $142
+    add (M1, 1) V368(0,0)<1> V361(0,0)<0;1,0> 0x700:uq                           /// $143
+    lsc_load.ugm (M1, 1)  V360.1792:d32x64t  flat[V368]:a64                      /// $144
+    add (M1, 1) V369(0,0)<1> V361(0,0)<0;1,0> 0x800:uq                           /// $145
+    lsc_load.ugm (M1, 1)  V360.2048:d32x64t  flat[V369]:a64                      /// $146
+    add (M1, 1) V370(0,0)<1> V361(0,0)<0;1,0> 0x900:uq                           /// $147
+    lsc_load.ugm (M1, 1)  V360.2304:d32x64t  flat[V370]:a64                      /// $148
+    add (M1, 1) V371(0,0)<1> V361(0,0)<0;1,0> 0xa00:uq                           /// $149
+    lsc_load.ugm (M1, 1)  V360.2560:d32x64t  flat[V371]:a64                      /// $150
+    add (M1, 1) V372(0,0)<1> V361(0,0)<0;1,0> 0xb00:uq                           /// $151
+    lsc_load.ugm (M1, 1)  V360.2816:d32x64t  flat[V372]:a64                      /// $152
+    add (M1, 1) V373(0,0)<1> V361(0,0)<0;1,0> 0xc00:uq                           /// $153
+    lsc_load.ugm (M1, 1)  V360.3072:d32x64t  flat[V373]:a64                      /// $154
+    add (M1, 1) V374(0,0)<1> V361(0,0)<0;1,0> 0xd00:uq                           /// $155
+    lsc_load.ugm (M1, 1)  V360.3328:d32x64t  flat[V374]:a64                      /// $156
+    add (M1, 1) V375(0,0)<1> V361(0,0)<0;1,0> 0xe00:uq                           /// $157
+    lsc_load.ugm (M1, 1)  V360.3584:d32x64t  flat[V375]:a64                      /// $158
+    add (M1, 1) V376(0,0)<1> V361(0,0)<0;1,0> 0xf00:uq                           /// $159
+    lsc_load.ugm (M1, 1)  V360.3840:d32x64t  flat[V376]:a64                      /// $160
+    jmp (M1, 1) BB_8                                                             /// $161
+
+BB_7:
+    add (M1, 1) V351(0,0)<1> V319(0,0)<0;1,0> (-)V351(0,0)<0;1,0>                /// $163
+    shl (M1, 1) V357(0,0)<1> V357(0,0)<0;1,0> 0x1:q                              /// $164
+    add (M1, 1) V357(0,0)<1> V359(0,0)<0;1,0> V357(0,0)<0;1,0>                   /// $165
+    mov (M1, 32) V360(0,0)<1> 0x0:d                                              /// $166
+    cmp.lt (M1, 1) P12 V354(0,0)<0;1,0> 0x80:ud                                  /// $167
+    mov (M1, 32) V360(2,0)<1> 0x0:d                                              /// $168
+    mov (M1, 32) V360(4,0)<1> 0x0:d                                              /// $169
+    mov (M1, 32) V360(6,0)<1> 0x0:d                                              /// $170
+    mov (M1, 32) V360(8,0)<1> 0x0:d                                              /// $171
+    mov (M1, 32) V360(10,0)<1> 0x0:d                                             /// $172
+    mov (M1, 32) V360(12,0)<1> 0x0:d                                             /// $173
+    mov (M1, 32) V360(14,0)<1> 0x0:d                                             /// $174
+    mov (M1, 32) V360(16,0)<1> 0x0:d                                             /// $175
+    mov (M1, 32) V360(18,0)<1> 0x0:d                                             /// $176
+    mov (M1, 32) V360(20,0)<1> 0x0:d                                             /// $177
+    mov (M1, 32) V360(22,0)<1> 0x0:d                                             /// $178
+    mov (M1, 32) V360(24,0)<1> 0x0:d                                             /// $179
+    mov (M1, 32) V360(26,0)<1> 0x0:d                                             /// $180
+    mov (M1, 32) V360(28,0)<1> 0x0:d                                             /// $181
+    mov (M1, 32) V360(30,0)<1> 0x0:d                                             /// $182
+    mov (M1, 32) V360(32,0)<1> 0x0:d                                             /// $183
+    mov (M1, 32) V360(34,0)<1> 0x0:d                                             /// $184
+    mov (M1, 32) V360(36,0)<1> 0x0:d                                             /// $185
+    mov (M1, 32) V360(38,0)<1> 0x0:d                                             /// $186
+    mov (M1, 32) V360(40,0)<1> 0x0:d                                             /// $187
+    mov (M1, 32) V360(42,0)<1> 0x0:d                                             /// $188
+    mov (M1, 32) V360(44,0)<1> 0x0:d                                             /// $189
+    mov (M1, 32) V360(46,0)<1> 0x0:d                                             /// $190
+    mov (M1, 32) V360(48,0)<1> 0x0:d                                             /// $191
+    mov (M1, 32) V360(50,0)<1> 0x0:d                                             /// $192
+    mov (M1, 32) V360(52,0)<1> 0x0:d                                             /// $193
+    mov (M1, 32) V360(54,0)<1> 0x0:d                                             /// $194
+    mov (M1, 32) V360(56,0)<1> 0x0:d                                             /// $195
+    mov (M1, 32) V360(58,0)<1> 0x0:d                                             /// $196
+    mov (M1, 32) V360(60,0)<1> 0x0:d                                             /// $197
+    mov (M1, 32) V360(62,0)<1> 0x0:d                                             /// $198
+    (P12) jmp (M1, 1) BB_8                                                       /// $199
+    mov (M1, 1) V147(0,0)<1> 0x0:q                                               /// $200
+
+BB_9:
+    shl (M1, 1) V377(0,0)<1> V378(0,0)<0;1,0> 0x7:q                              /// $202
+    shl (M1, 1) V379(0,0)<1> V377(0,0)<0;1,0> 0x1:q                              /// $203
+    add (M1, 1) V380(0,0)<1> V357(0,0)<0;1,0> V379(0,0)<0;1,0>                   /// $204
+    lifetime.start V381                                                          /// $205
+    lsc_load.ugm (M1, 1)  V381:d32x64t  flat[V382]:a64                           /// $206
+    shl (M1, 1) V383(0,0)<1> V384(0,0)<0;1,0> 0x1:w                              /// $207
+    addr_add (M1, 1) A0(0)<1> &V153 V385(0,0)<0;1,0>                             /// $208
+    mov (M1, 32) r[A0(0),0]<1>:hf V150(0,0)<1;1,0>                               /// $209
+    mov (M1, 32) r[A0(0),64]<1>:hf V150(1,0)<1;1,0>                              /// $210
+    mov (M1, 32) r[A0(0),128]<1>:hf V150(2,0)<1;1,0>                             /// $211
+    mov (M1, 32) r[A0(0),192]<1>:hf V150(3,0)<1;1,0>                             /// $212
+    add (M1, 1) V378(0,0)<1> V378(0,0)<0;1,0> 0x1:q                              /// $213
+    cmp.eq (M1, 1) P13 V386(0,0)<0;1,0> V387(0,0)<0;1,0>                         /// $214
+    cmp.eq (M1, 1) P14 V386(0,1)<0;1,0> V387(0,1)<0;1,0>                         /// $215
+    and (M1, 1) P15 P13 P14                                                      /// $216
+    (!P15) jmp (M1, 1) BB_9                                                      /// $217
+
+BB_8:
+    lifetime.start V154                                                          /// $219
+    lsc_load.ugm (M1, 1)  V154:d64  flat[V388]:a64                               /// $220
+    shl (M1, 1) V389(0,0)<1> V343(0,0)<0;1,0> 0xc:d                              /// $221
+    add (M1, 1) V389(0,0)<1> V389(0,0)<0;1,0> V311(0,0)<0;1,0>                   /// $222
+    mov (M1, 1) V156(0,0)<1> V390(0,0)<0;1,0>                                    /// $223
+    shl (M1, 1) V391(0,0)<1> V391(0,0)<0;1,0> 0x1:q                              /// $224
+    add (M1, 1) V392(0,0)<1> V393(0,0)<0;1,0> V391(0,0)<0;1,0>                   /// $225
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V360:d32x64t                          /// $226
+    add (M1, 1) V395(0,0)<1> V394(0,0)<0;1,0> 0x100:uq                           /// $227
+    lsc_store.ugm (M1, 1)  flat[V395]:a64  V360.256:d32x64t                      /// $228
+    add (M1, 1) V396(0,0)<1> V394(0,0)<0;1,0> 0x200:uq                           /// $229
+    lsc_store.ugm (M1, 1)  flat[V396]:a64  V360.512:d32x64t                      /// $230
+    add (M1, 1) V397(0,0)<1> V394(0,0)<0;1,0> 0x300:uq                           /// $231
+    lsc_store.ugm (M1, 1)  flat[V397]:a64  V360.768:d32x64t                      /// $232
+    add (M1, 1) V398(0,0)<1> V394(0,0)<0;1,0> 0x400:uq                           /// $233
+    lsc_store.ugm (M1, 1)  flat[V398]:a64  V360.1024:d32x64t                     /// $234
+    add (M1, 1) V399(0,0)<1> V394(0,0)<0;1,0> 0x500:uq                           /// $235
+    lsc_store.ugm (M1, 1)  flat[V399]:a64  V360.1280:d32x64t                     /// $236
+    add (M1, 1) V400(0,0)<1> V394(0,0)<0;1,0> 0x600:uq                           /// $237
+    lsc_store.ugm (M1, 1)  flat[V400]:a64  V360.1536:d32x64t                     /// $238
+    add (M1, 1) V401(0,0)<1> V394(0,0)<0;1,0> 0x700:uq                           /// $239
+    lsc_store.ugm (M1, 1)  flat[V401]:a64  V360.1792:d32x64t                     /// $240
+    add (M1, 1) V402(0,0)<1> V394(0,0)<0;1,0> 0x800:uq                           /// $241
+    lsc_store.ugm (M1, 1)  flat[V402]:a64  V360.2048:d32x64t                     /// $242
+    add (M1, 1) V403(0,0)<1> V394(0,0)<0;1,0> 0x900:uq                           /// $243
+    lsc_store.ugm (M1, 1)  flat[V403]:a64  V360.2304:d32x64t                     /// $244
+    add (M1, 1) V404(0,0)<1> V394(0,0)<0;1,0> 0xa00:uq                           /// $245
+    lsc_store.ugm (M1, 1)  flat[V404]:a64  V360.2560:d32x64t                     /// $246
+    add (M1, 1) V405(0,0)<1> V394(0,0)<0;1,0> 0xb00:uq                           /// $247
+    lsc_store.ugm (M1, 1)  flat[V405]:a64  V360.2816:d32x64t                     /// $248
+    add (M1, 1) V406(0,0)<1> V394(0,0)<0;1,0> 0xc00:uq                           /// $249
+    lsc_store.ugm (M1, 1)  flat[V406]:a64  V360.3072:d32x64t                     /// $250
+    add (M1, 1) V407(0,0)<1> V394(0,0)<0;1,0> 0xd00:uq                           /// $251
+    lsc_store.ugm (M1, 1)  flat[V407]:a64  V360.3328:d32x64t                     /// $252
+    add (M1, 1) V408(0,0)<1> V394(0,0)<0;1,0> 0xe00:uq                           /// $253
+    lsc_store.ugm (M1, 1)  flat[V408]:a64  V360.3584:d32x64t                     /// $254
+    add (M1, 1) V394(0,0)<1> V394(0,0)<0;1,0> 0xf00:uq                           /// $255
+    mov (M1, 32) V256(0,0)<1> V153(60,0)<1;1,0>                                  /// $256
+    mov (M1, 32) V256(1,0)<1> V153(61,0)<1;1,0>                                  /// $257
+    mov (M1, 32) V256(2,0)<1> V153(62,0)<1;1,0>                                  /// $258
+    mov (M1, 32) V256(3,0)<1> V153(63,0)<1;1,0>                                  /// $259
+    jmp (M1, 1) BB_10                                                            /// $260
+
+BB_5:
+    cmp.eq (M1, 1) P16 V315(0,0)<0;1,0> 0x6:d                                    /// $262
+    (!P16) jmp (M1, 1) BB_6                                                      /// $263
+    add (M1, 1) V409(0,0)<1> V343(0,0)<0;1,0> V352(0,0)<0;1,0>                   /// $264
+    shl (M1, 1) V409(0,0)<1> V409(0,0)<0;1,0> 0xa:d                              /// $265
+    add (M1, 1) V410(0,0)<1> V409(0,0)<0;1,0> 0x400:d                            /// $266
+    mov (M1, 1) V181(0,0)<1> V411(0,0)<0;1,0>                                    /// $267
+    cmp.gt (M1, 1) P17 V412(0,0)<0;1,0> V356(0,0)<0;1,0>                         /// $268
+    (P17) jmp (M1, 1) BB_11                                                      /// $269
+    shl (M1, 1) V413(0,0)<1> V413(0,0)<0;1,0> 0x1:q                              /// $270
+    add (M1, 1) V414(0,0)<1> V359(0,0)<0;1,0> V413(0,0)<0;1,0>                   /// $271
+    lsc_load.ugm (M1, 1)  V415:d32x64t  flat[V416]:a64                           /// $272
+    add (M1, 1) V417(0,0)<1> V416(0,0)<0;1,0> 0x100:uq                           /// $273
+    lsc_load.ugm (M1, 1)  V415.256:d32x64t  flat[V417]:a64                       /// $274
+    add (M1, 1) V418(0,0)<1> V416(0,0)<0;1,0> 0x200:uq                           /// $275
+    lsc_load.ugm (M1, 1)  V415.512:d32x64t  flat[V418]:a64                       /// $276
+    add (M1, 1) V419(0,0)<1> V416(0,0)<0;1,0> 0x300:uq                           /// $277
+    lsc_load.ugm (M1, 1)  V415.768:d32x64t  flat[V419]:a64                       /// $278
+    add (M1, 1) V420(0,0)<1> V416(0,0)<0;1,0> 0x400:uq                           /// $279
+    lsc_load.ugm (M1, 1)  V415.1024:d32x64t  flat[V420]:a64                      /// $280
+    add (M1, 1) V421(0,0)<1> V416(0,0)<0;1,0> 0x500:uq                           /// $281
+    lsc_load.ugm (M1, 1)  V415.1280:d32x64t  flat[V421]:a64                      /// $282
+    add (M1, 1) V422(0,0)<1> V416(0,0)<0;1,0> 0x600:uq                           /// $283
+    lsc_load.ugm (M1, 1)  V415.1536:d32x64t  flat[V422]:a64                      /// $284
+    add (M1, 1) V423(0,0)<1> V416(0,0)<0;1,0> 0x700:uq                           /// $285
+    lsc_load.ugm (M1, 1)  V415.1792:d32x64t  flat[V423]:a64                      /// $286
+    jmp (M1, 1) BB_12                                                            /// $287
+
+BB_11:
+    add (M1, 1) V409(0,0)<1> V319(0,0)<0;1,0> (-)V409(0,0)<0;1,0>                /// $289
+    shl (M1, 1) V413(0,0)<1> V413(0,0)<0;1,0> 0x1:q                              /// $290
+    add (M1, 1) V413(0,0)<1> V359(0,0)<0;1,0> V413(0,0)<0;1,0>                   /// $291
+    mov (M1, 32) V415(0,0)<1> 0x0:d                                              /// $292
+    mov (M1, 32) V415(2,0)<1> 0x0:d                                              /// $293
+    mov (M1, 32) V415(4,0)<1> 0x0:d                                              /// $294
+    mov (M1, 32) V415(6,0)<1> 0x0:d                                              /// $295
+    mov (M1, 32) V415(8,0)<1> 0x0:d                                              /// $296
+    mov (M1, 32) V415(10,0)<1> 0x0:d                                             /// $297
+    mov (M1, 32) V415(12,0)<1> 0x0:d                                             /// $298
+    mov (M1, 32) V415(14,0)<1> 0x0:d                                             /// $299
+    mov (M1, 32) V415(16,0)<1> 0x0:d                                             /// $300
+    mov (M1, 32) V415(18,0)<1> 0x0:d                                             /// $301
+    mov (M1, 32) V415(20,0)<1> 0x0:d                                             /// $302
+    mov (M1, 32) V415(22,0)<1> 0x0:d                                             /// $303
+    mov (M1, 32) V415(24,0)<1> 0x0:d                                             /// $304
+    mov (M1, 32) V415(26,0)<1> 0x0:d                                             /// $305
+    mov (M1, 32) V415(28,0)<1> 0x0:d                                             /// $306
+    mov (M1, 32) V415(30,0)<1> 0x0:d                                             /// $307
+    cmp.lt (M1, 1) P18 V411(0,0)<0;1,0> 0x80:ud                                  /// $308
+    (P18) jmp (M1, 1) BB_12                                                      /// $309
+    mov (M1, 1) V182(0,0)<1> 0x0:q                                               /// $310
+
+BB_13:
+    shl (M1, 1) V424(0,0)<1> V425(0,0)<0;1,0> 0x7:q                              /// $312
+    shl (M1, 1) V426(0,0)<1> V424(0,0)<0;1,0> 0x1:q                              /// $313
+    add (M1, 1) V427(0,0)<1> V413(0,0)<0;1,0> V426(0,0)<0;1,0>                   /// $314
+    lifetime.start V428                                                          /// $315
+    lsc_load.ugm (M1, 1)  V428:d32x64t  flat[V429]:a64                           /// $316
+    shl (M1, 1) V430(0,0)<1> V431(0,0)<0;1,0> 0x1:w                              /// $317
+    addr_add (M1, 1) A1(0)<1> &V188 V432(0,0)<0;1,0>                             /// $318
+    mov (M1, 32) r[A1(0),0]<1>:hf V185(0,0)<1;1,0>                               /// $319
+    mov (M1, 32) r[A1(0),64]<1>:hf V185(1,0)<1;1,0>                              /// $320
+    mov (M1, 32) r[A1(0),128]<1>:hf V185(2,0)<1;1,0>                             /// $321
+    mov (M1, 32) r[A1(0),192]<1>:hf V185(3,0)<1;1,0>                             /// $322
+    add (M1, 1) V425(0,0)<1> V425(0,0)<0;1,0> 0x1:q                              /// $323
+    cmp.eq (M1, 1) P19 V433(0,1)<0;1,0> V434(0,1)<0;1,0>                         /// $324
+    cmp.eq (M1, 1) P20 V433(0,0)<0;1,0> V434(0,0)<0;1,0>                         /// $325
+    and (M1, 1) P21 P20 P19                                                      /// $326
+    (!P21) jmp (M1, 1) BB_13                                                     /// $327
+
+BB_12:
+    lifetime.start V189                                                          /// $329
+    lsc_load.ugm (M1, 1)  V189:d64  flat[V388]:a64                               /// $330
+    shl (M1, 1) V435(0,0)<1> V343(0,0)<0;1,0> 0xb:d                              /// $331
+    add (M1, 1) V435(0,0)<1> V435(0,0)<0;1,0> V311(0,0)<0;1,0>                   /// $332
+    mov (M1, 1) V191(0,0)<1> V436(0,0)<0;1,0>                                    /// $333
+    shl (M1, 1) V437(0,0)<1> V437(0,0)<0;1,0> 0x1:q                              /// $334
+    add (M1, 1) V392(0,0)<1> V438(0,0)<0;1,0> V437(0,0)<0;1,0>                   /// $335
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V415:d32x64t                          /// $336
+    add (M1, 1) V439(0,0)<1> V394(0,0)<0;1,0> 0x100:uq                           /// $337
+    lsc_store.ugm (M1, 1)  flat[V439]:a64  V415.256:d32x64t                      /// $338
+    add (M1, 1) V440(0,0)<1> V394(0,0)<0;1,0> 0x200:uq                           /// $339
+    lsc_store.ugm (M1, 1)  flat[V440]:a64  V415.512:d32x64t                      /// $340
+    add (M1, 1) V441(0,0)<1> V394(0,0)<0;1,0> 0x300:uq                           /// $341
+    lsc_store.ugm (M1, 1)  flat[V441]:a64  V415.768:d32x64t                      /// $342
+    add (M1, 1) V442(0,0)<1> V394(0,0)<0;1,0> 0x400:uq                           /// $343
+    lsc_store.ugm (M1, 1)  flat[V442]:a64  V415.1024:d32x64t                     /// $344
+    add (M1, 1) V443(0,0)<1> V394(0,0)<0;1,0> 0x500:uq                           /// $345
+    lsc_store.ugm (M1, 1)  flat[V443]:a64  V415.1280:d32x64t                     /// $346
+    add (M1, 1) V444(0,0)<1> V394(0,0)<0;1,0> 0x600:uq                           /// $347
+    lsc_store.ugm (M1, 1)  flat[V444]:a64  V415.1536:d32x64t                     /// $348
+    add (M1, 1) V394(0,0)<1> V394(0,0)<0;1,0> 0x700:uq                           /// $349
+    mov (M1, 32) V256(0,0)<1> V188(28,0)<1;1,0>                                  /// $350
+    mov (M1, 32) V256(1,0)<1> V188(29,0)<1;1,0>                                  /// $351
+    mov (M1, 32) V256(2,0)<1> V188(30,0)<1;1,0>                                  /// $352
+    mov (M1, 32) V256(3,0)<1> V188(31,0)<1;1,0>                                  /// $353
+    jmp (M1, 1) BB_10                                                            /// $354
+
+BB_4:
+    add (M1, 1) V445(0,0)<1> V343(0,0)<0;1,0> V352(0,0)<0;1,0>                   /// $356
+    mul (M1, 1) V445(0,0)<1> V445(0,0)<0;1,0> 0x300:d                            /// $357
+    add (M1, 1) V446(0,0)<1> V445(0,0)<0;1,0> 0x300:d                            /// $358
+    mov (M1, 1) V206(0,0)<1> V447(0,0)<0;1,0>                                    /// $359
+    cmp.gt (M1, 1) P22 V448(0,0)<0;1,0> V356(0,0)<0;1,0>                         /// $360
+    (P22) jmp (M1, 1) BB_14                                                      /// $361
+    shl (M1, 1) V449(0,0)<1> V449(0,0)<0;1,0> 0x1:q                              /// $362
+    add (M1, 1) V450(0,0)<1> V359(0,0)<0;1,0> V449(0,0)<0;1,0>                   /// $363
+    lsc_load.ugm (M1, 1)  V451:d32x64t  flat[V452]:a64                           /// $364
+    add (M1, 1) V453(0,0)<1> V452(0,0)<0;1,0> 0x100:uq                           /// $365
+    lsc_load.ugm (M1, 1)  V451.256:d32x64t  flat[V453]:a64                       /// $366
+    add (M1, 1) V454(0,0)<1> V452(0,0)<0;1,0> 0x200:uq                           /// $367
+    lsc_load.ugm (M1, 1)  V451.512:d32x64t  flat[V454]:a64                       /// $368
+    add (M1, 1) V455(0,0)<1> V452(0,0)<0;1,0> 0x300:uq                           /// $369
+    lsc_load.ugm (M1, 1)  V451.768:d32x64t  flat[V455]:a64                       /// $370
+    add (M1, 1) V456(0,0)<1> V452(0,0)<0;1,0> 0x400:uq                           /// $371
+    lsc_load.ugm (M1, 1)  V451.1024:d32x64t  flat[V456]:a64                      /// $372
+    add (M1, 1) V457(0,0)<1> V452(0,0)<0;1,0> 0x500:uq                           /// $373
+    lsc_load.ugm (M1, 1)  V451.1280:d32x64t  flat[V457]:a64                      /// $374
+    jmp (M1, 1) BB_15                                                            /// $375
+
+BB_14:
+    add (M1, 1) V445(0,0)<1> V319(0,0)<0;1,0> (-)V445(0,0)<0;1,0>                /// $377
+    shl (M1, 1) V449(0,0)<1> V449(0,0)<0;1,0> 0x1:q                              /// $378
+    add (M1, 1) V449(0,0)<1> V359(0,0)<0;1,0> V449(0,0)<0;1,0>                   /// $379
+    mov (M1, 32) V451(0,0)<1> 0x0:d                                              /// $380
+    mov (M1, 32) V451(2,0)<1> 0x0:d                                              /// $381
+    mov (M1, 32) V451(4,0)<1> 0x0:d                                              /// $382
+    mov (M1, 32) V451(6,0)<1> 0x0:d                                              /// $383
+    mov (M1, 32) V451(8,0)<1> 0x0:d                                              /// $384
+    mov (M1, 32) V451(10,0)<1> 0x0:d                                             /// $385
+    mov (M1, 32) V451(12,0)<1> 0x0:d                                             /// $386
+    mov (M1, 32) V451(14,0)<1> 0x0:d                                             /// $387
+    mov (M1, 32) V451(16,0)<1> 0x0:d                                             /// $388
+    mov (M1, 32) V451(18,0)<1> 0x0:d                                             /// $389
+    mov (M1, 32) V451(20,0)<1> 0x0:d                                             /// $390
+    mov (M1, 32) V451(22,0)<1> 0x0:d                                             /// $391
+    cmp.lt (M1, 1) P23 V447(0,0)<0;1,0> 0x80:ud                                  /// $392
+    (P23) jmp (M1, 1) BB_15                                                      /// $393
+    mov (M1, 1) V207(0,0)<1> 0x0:q                                               /// $394
+
+BB_16:
+    shl (M1, 1) V458(0,0)<1> V459(0,0)<0;1,0> 0x7:q                              /// $396
+    shl (M1, 1) V460(0,0)<1> V458(0,0)<0;1,0> 0x1:q                              /// $397
+    add (M1, 1) V461(0,0)<1> V449(0,0)<0;1,0> V460(0,0)<0;1,0>                   /// $398
+    lifetime.start V462                                                          /// $399
+    lsc_load.ugm (M1, 1)  V462:d32x64t  flat[V463]:a64                           /// $400
+    shl (M1, 1) V464(0,0)<1> V465(0,0)<0;1,0> 0x1:w                              /// $401
+    addr_add (M1, 1) A2(0)<1> &V213 V466(0,0)<0;1,0>                             /// $402
+    mov (M1, 32) r[A2(0),0]<1>:hf V210(0,0)<1;1,0>                               /// $403
+    mov (M1, 32) r[A2(0),64]<1>:hf V210(1,0)<1;1,0>                              /// $404
+    mov (M1, 32) r[A2(0),128]<1>:hf V210(2,0)<1;1,0>                             /// $405
+    mov (M1, 32) r[A2(0),192]<1>:hf V210(3,0)<1;1,0>                             /// $406
+    add (M1, 1) V459(0,0)<1> V459(0,0)<0;1,0> 0x1:q                              /// $407
+    cmp.eq (M1, 1) P24 V467(0,1)<0;1,0> V468(0,1)<0;1,0>                         /// $408
+    cmp.eq (M1, 1) P25 V467(0,0)<0;1,0> V468(0,0)<0;1,0>                         /// $409
+    and (M1, 1) P26 P25 P24                                                      /// $410
+    (!P26) jmp (M1, 1) BB_16                                                     /// $411
+
+BB_15:
+    lifetime.start V214                                                          /// $413
+    lsc_load.ugm (M1, 1)  V214:d64  flat[V388]:a64                               /// $414
+    mul (M1, 1) V469(0,0)<1> V343(0,0)<0;1,0> 0x600:d                            /// $415
+    add (M1, 1) V469(0,0)<1> V469(0,0)<0;1,0> V311(0,0)<0;1,0>                   /// $416
+    mov (M1, 1) V216(0,0)<1> V470(0,0)<0;1,0>                                    /// $417
+    shl (M1, 1) V471(0,0)<1> V471(0,0)<0;1,0> 0x1:q                              /// $418
+    add (M1, 1) V392(0,0)<1> V472(0,0)<0;1,0> V471(0,0)<0;1,0>                   /// $419
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V451:d32x64t                          /// $420
+    add (M1, 1) V473(0,0)<1> V394(0,0)<0;1,0> 0x100:uq                           /// $421
+    lsc_store.ugm (M1, 1)  flat[V473]:a64  V451.256:d32x64t                      /// $422
+    add (M1, 1) V474(0,0)<1> V394(0,0)<0;1,0> 0x200:uq                           /// $423
+    lsc_store.ugm (M1, 1)  flat[V474]:a64  V451.512:d32x64t                      /// $424
+    add (M1, 1) V475(0,0)<1> V394(0,0)<0;1,0> 0x300:uq                           /// $425
+    lsc_store.ugm (M1, 1)  flat[V475]:a64  V451.768:d32x64t                      /// $426
+    add (M1, 1) V476(0,0)<1> V394(0,0)<0;1,0> 0x400:uq                           /// $427
+    lsc_store.ugm (M1, 1)  flat[V476]:a64  V451.1024:d32x64t                     /// $428
+    add (M1, 1) V394(0,0)<1> V394(0,0)<0;1,0> 0x500:uq                           /// $429
+    mov (M1, 32) V256(0,0)<1> V213(20,0)<1;1,0>                                  /// $430
+    mov (M1, 32) V256(1,0)<1> V213(21,0)<1;1,0>                                  /// $431
+    mov (M1, 32) V256(2,0)<1> V213(22,0)<1;1,0>                                  /// $432
+    mov (M1, 32) V256(3,0)<1> V213(23,0)<1;1,0>                                  /// $433
+    jmp (M1, 1) BB_10                                                            /// $434
+
+BB_3:
+    cmp.eq (M1, 1) P27 V315(0,0)<0;1,0> 0x2:d                                    /// $436
+    (P27) jmp (M1, 1) BB_17                                                      /// $437
+    cmp.eq (M1, 1) P28 V315(0,0)<0;1,0> 0x0:d                                    /// $438
+    (!P28) jmp (M1, 1) BB_6                                                      /// $439
+    add (M1, 1) V477(0,0)<1> V343(0,0)<0;1,0> V352(0,0)<0;1,0>                   /// $440
+    shl (M1, 1) V477(0,0)<1> V477(0,0)<0;1,0> 0x8:d                              /// $441
+    add (M1, 1) V478(0,0)<1> V477(0,0)<0;1,0> 0x100:d                            /// $442
+    mov (M1, 1) V225(0,0)<1> V479(0,0)<0;1,0>                                    /// $443
+    cmp.gt (M1, 1) P29 V480(0,0)<0;1,0> V356(0,0)<0;1,0>                         /// $444
+    (P29) jmp (M1, 1) BB_18                                                      /// $445
+    shl (M1, 1) V481(0,0)<1> V481(0,0)<0;1,0> 0x1:q                              /// $446
+    add (M1, 1) V482(0,0)<1> V359(0,0)<0;1,0> V481(0,0)<0;1,0>                   /// $447
+    lsc_load.ugm (M1, 1)  V483:d32x64t  flat[V484]:a64                           /// $448
+    add (M1, 1) V485(0,0)<1> V484(0,0)<0;1,0> 0x100:uq                           /// $449
+    lsc_load.ugm (M1, 1)  V483.256:d32x64t  flat[V485]:a64                       /// $450
+    jmp (M1, 1) BB_19                                                            /// $451
+
+BB_18:
+    add (M1, 1) V477(0,0)<1> V319(0,0)<0;1,0> (-)V477(0,0)<0;1,0>                /// $453
+    shl (M1, 1) V481(0,0)<1> V481(0,0)<0;1,0> 0x1:q                              /// $454
+    add (M1, 1) V481(0,0)<1> V359(0,0)<0;1,0> V481(0,0)<0;1,0>                   /// $455
+    mov (M1, 32) V483(0,0)<1> 0x0:d                                              /// $456
+    mov (M1, 32) V483(2,0)<1> 0x0:d                                              /// $457
+    mov (M1, 32) V483(4,0)<1> 0x0:d                                              /// $458
+    mov (M1, 32) V483(6,0)<1> 0x0:d                                              /// $459
+    cmp.lt (M1, 1) P30 V479(0,0)<0;1,0> 0x80:ud                                  /// $460
+    (P30) jmp (M1, 1) BB_19                                                      /// $461
+    mov (M1, 1) V226(0,0)<1> 0x0:q                                               /// $462
+
+BB_20:
+    shl (M1, 1) V486(0,0)<1> V487(0,0)<0;1,0> 0x7:q                              /// $464
+    shl (M1, 1) V488(0,0)<1> V486(0,0)<0;1,0> 0x1:q                              /// $465
+    add (M1, 1) V489(0,0)<1> V481(0,0)<0;1,0> V488(0,0)<0;1,0>                   /// $466
+    lifetime.start V490                                                          /// $467
+    lsc_load.ugm (M1, 1)  V490:d32x64t  flat[V491]:a64                           /// $468
+    shl (M1, 1) V492(0,0)<1> V493(0,0)<0;1,0> 0x1:w                              /// $469
+    addr_add (M1, 1) A3(0)<1> &V232 V494(0,0)<0;1,0>                             /// $470
+    mov (M1, 32) r[A3(0),0]<1>:hf V229(0,0)<1;1,0>                               /// $471
+    mov (M1, 32) r[A3(0),64]<1>:hf V229(1,0)<1;1,0>                              /// $472
+    mov (M1, 32) r[A3(0),128]<1>:hf V229(2,0)<1;1,0>                             /// $473
+    mov (M1, 32) r[A3(0),192]<1>:hf V229(3,0)<1;1,0>                             /// $474
+    add (M1, 1) V487(0,0)<1> V487(0,0)<0;1,0> 0x1:q                              /// $475
+    cmp.eq (M1, 1) P31 V495(0,1)<0;1,0> V496(0,1)<0;1,0>                         /// $476
+    cmp.eq (M1, 1) P32 V495(0,0)<0;1,0> V496(0,0)<0;1,0>                         /// $477
+    and (M1, 1) P33 P32 P31                                                      /// $478
+    (!P33) jmp (M1, 1) BB_20                                                     /// $479
+
+BB_19:
+    lifetime.start V233                                                          /// $481
+    lsc_load.ugm (M1, 1)  V233:d64  flat[V388]:a64                               /// $482
+    shl (M1, 1) V497(0,0)<1> V343(0,0)<0;1,0> 0x9:d                              /// $483
+    add (M1, 1) V497(0,0)<1> V497(0,0)<0;1,0> V311(0,0)<0;1,0>                   /// $484
+    mov (M1, 1) V235(0,0)<1> V498(0,0)<0;1,0>                                    /// $485
+    shl (M1, 1) V499(0,0)<1> V499(0,0)<0;1,0> 0x1:q                              /// $486
+    add (M1, 1) V392(0,0)<1> V500(0,0)<0;1,0> V499(0,0)<0;1,0>                   /// $487
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V483:d32x64t                          /// $488
+    add (M1, 1) V394(0,0)<1> V394(0,0)<0;1,0> 0x100:uq                           /// $489
+    mov (M1, 32) V256(0,0)<1> V232(4,0)<1;1,0>                                   /// $490
+    mov (M1, 32) V256(1,0)<1> V232(5,0)<1;1,0>                                   /// $491
+    mov (M1, 32) V256(2,0)<1> V232(6,0)<1;1,0>                                   /// $492
+    mov (M1, 32) V256(3,0)<1> V232(7,0)<1;1,0>                                   /// $493
+    jmp (M1, 1) BB_10                                                            /// $494
+
+BB_17:
+    add (M1, 1) V501(0,0)<1> V343(0,0)<0;1,0> V352(0,0)<0;1,0>                   /// $496
+    shl (M1, 1) V501(0,0)<1> V501(0,0)<0;1,0> 0x9:d                              /// $497
+    add (M1, 1) V502(0,0)<1> V501(0,0)<0;1,0> 0x200:d                            /// $498
+    mov (M1, 1) V242(0,0)<1> V503(0,0)<0;1,0>                                    /// $499
+    cmp.gt (M1, 1) P34 V504(0,0)<0;1,0> V356(0,0)<0;1,0>                         /// $500
+    (P34) jmp (M1, 1) BB_21                                                      /// $501
+    shl (M1, 1) V505(0,0)<1> V505(0,0)<0;1,0> 0x1:q                              /// $502
+    add (M1, 1) V506(0,0)<1> V359(0,0)<0;1,0> V505(0,0)<0;1,0>                   /// $503
+    lsc_load.ugm (M1, 1)  V507:d32x64t  flat[V508]:a64                           /// $504
+    add (M1, 1) V509(0,0)<1> V508(0,0)<0;1,0> 0x100:uq                           /// $505
+    lsc_load.ugm (M1, 1)  V507.256:d32x64t  flat[V509]:a64                       /// $506
+    add (M1, 1) V510(0,0)<1> V508(0,0)<0;1,0> 0x200:uq                           /// $507
+    lsc_load.ugm (M1, 1)  V507.512:d32x64t  flat[V510]:a64                       /// $508
+    add (M1, 1) V511(0,0)<1> V508(0,0)<0;1,0> 0x300:uq                           /// $509
+    lsc_load.ugm (M1, 1)  V507.768:d32x64t  flat[V511]:a64                       /// $510
+    jmp (M1, 1) BB_22                                                            /// $511
+
+BB_21:
+    add (M1, 1) V501(0,0)<1> V319(0,0)<0;1,0> (-)V501(0,0)<0;1,0>                /// $513
+    shl (M1, 1) V505(0,0)<1> V505(0,0)<0;1,0> 0x1:q                              /// $514
+    add (M1, 1) V505(0,0)<1> V359(0,0)<0;1,0> V505(0,0)<0;1,0>                   /// $515
+    mov (M1, 32) V507(0,0)<1> 0x0:d                                              /// $516
+    mov (M1, 32) V507(2,0)<1> 0x0:d                                              /// $517
+    mov (M1, 32) V507(4,0)<1> 0x0:d                                              /// $518
+    mov (M1, 32) V507(6,0)<1> 0x0:d                                              /// $519
+    mov (M1, 32) V507(8,0)<1> 0x0:d                                              /// $520
+    mov (M1, 32) V507(10,0)<1> 0x0:d                                             /// $521
+    mov (M1, 32) V507(12,0)<1> 0x0:d                                             /// $522
+    mov (M1, 32) V507(14,0)<1> 0x0:d                                             /// $523
+    cmp.lt (M1, 1) P35 V503(0,0)<0;1,0> 0x80:ud                                  /// $524
+    (P35) jmp (M1, 1) BB_22                                                      /// $525
+    mov (M1, 1) V243(0,0)<1> 0x0:q                                               /// $526
+
+BB_23:
+    shl (M1, 1) V512(0,0)<1> V513(0,0)<0;1,0> 0x7:q                              /// $528
+    shl (M1, 1) V514(0,0)<1> V512(0,0)<0;1,0> 0x1:q                              /// $529
+    add (M1, 1) V515(0,0)<1> V505(0,0)<0;1,0> V514(0,0)<0;1,0>                   /// $530
+    lifetime.start V516                                                          /// $531
+    lsc_load.ugm (M1, 1)  V516:d32x64t  flat[V517]:a64                           /// $532
+    shl (M1, 1) V518(0,0)<1> V519(0,0)<0;1,0> 0x1:w                              /// $533
+    addr_add (M1, 1) A4(0)<1> &V249 V520(0,0)<0;1,0>                             /// $534
+    mov (M1, 32) r[A4(0),0]<1>:hf V246(0,0)<1;1,0>                               /// $535
+    mov (M1, 32) r[A4(0),64]<1>:hf V246(1,0)<1;1,0>                              /// $536
+    mov (M1, 32) r[A4(0),128]<1>:hf V246(2,0)<1;1,0>                             /// $537
+    mov (M1, 32) r[A4(0),192]<1>:hf V246(3,0)<1;1,0>                             /// $538
+    add (M1, 1) V513(0,0)<1> V513(0,0)<0;1,0> 0x1:q                              /// $539
+    cmp.eq (M1, 1) P36 V521(0,1)<0;1,0> V522(0,1)<0;1,0>                         /// $540
+    cmp.eq (M1, 1) P37 V521(0,0)<0;1,0> V522(0,0)<0;1,0>                         /// $541
+    and (M1, 1) P38 P37 P36                                                      /// $542
+    (!P38) jmp (M1, 1) BB_23                                                     /// $543
+
+BB_22:
+    lifetime.start V250                                                          /// $545
+    lsc_load.ugm (M1, 1)  V250:d64  flat[V388]:a64                               /// $546
+    shl (M1, 1) V523(0,0)<1> V343(0,0)<0;1,0> 0xa:d                              /// $547
+    add (M1, 1) V523(0,0)<1> V523(0,0)<0;1,0> V311(0,0)<0;1,0>                   /// $548
+    mov (M1, 1) V252(0,0)<1> V524(0,0)<0;1,0>                                    /// $549
+    shl (M1, 1) V525(0,0)<1> V525(0,0)<0;1,0> 0x1:q                              /// $550
+    add (M1, 1) V392(0,0)<1> V526(0,0)<0;1,0> V525(0,0)<0;1,0>                   /// $551
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V507:d32x64t                          /// $552
+    add (M1, 1) V527(0,0)<1> V394(0,0)<0;1,0> 0x100:uq                           /// $553
+    lsc_store.ugm (M1, 1)  flat[V527]:a64  V507.256:d32x64t                      /// $554
+    add (M1, 1) V528(0,0)<1> V394(0,0)<0;1,0> 0x200:uq                           /// $555
+    lsc_store.ugm (M1, 1)  flat[V528]:a64  V507.512:d32x64t                      /// $556
+    add (M1, 1) V394(0,0)<1> V394(0,0)<0;1,0> 0x300:uq                           /// $557
+    mov (M1, 32) V256(0,0)<1> V249(12,0)<1;1,0>                                  /// $558
+    mov (M1, 32) V256(1,0)<1> V249(13,0)<1;1,0>                                  /// $559
+    mov (M1, 32) V256(2,0)<1> V249(14,0)<1;1,0>                                  /// $560
+    mov (M1, 32) V256(3,0)<1> V249(15,0)<1;1,0>                                  /// $561
+
+BB_10:
+    lsc_store.ugm (M1, 1)  flat[V394]:a64  V529:d32x64t                          /// $563
+
+BB_6:
+    add (M1, 1) V530(0,0)<1> V530(0,0)<0;1,0> 0x1:q                              /// $565
+    cmp.eq (M1, 1) P39 V342(0,1)<0;1,0> V531(0,1)<0;1,0>                         /// $566
+    cmp.eq (M1, 1) P40 V342(0,0)<0;1,0> V531(0,0)<0;1,0>                         /// $567
+    and (M1, 1) P41 P40 P39                                                      /// $568
+    add (M1, 1) V338(0,0)<1> V338(0,0)<0;1,0> 0xff900000:ud                      /// $569
+    add (M1, 1) V336(0,0)<1> V336(0,0)<0;1,0> 0xffc80000:ud                      /// $570
+    add (M1, 1) V334(0,0)<1> V334(0,0)<0;1,0> 0xffd60000:ud                      /// $571
+    add (M1, 1) V332(0,0)<1> V332(0,0)<0;1,0> 0xffe40000:ud                      /// $572
+    add (M1, 1) V330(0,0)<1> V330(0,0)<0;1,0> 0xfff20000:ud                      /// $573
+    (!P41) jmp (M1, 1) BB_2                                                      /// $574
+
+BB_1:
+    ret (M1, 1)                                                                  /// $576
+
+//Platform: PVCXT
+//Build option: "-abiver 2 -output -binary -dumpcommonisa -enableHalfLSC "
