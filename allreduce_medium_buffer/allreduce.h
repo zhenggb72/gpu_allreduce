@@ -14,6 +14,7 @@
 #include <chrono>
 #include <thread>
 
+#define ALIGN    4
 #define MAX_RANK 16
 #define MAX_REPETITION 6
 #define INIT_SIZE 64
@@ -115,8 +116,8 @@ void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int t
         int count = (size - read_offset + SIMD_COMPUTE - 1) / SIMD_COMPUTE;
         for (int i = 0; i < count; i++)
         {
-            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                ((T *)inout_buffer + read_offset + i * SIMD_COMPUTE);
+            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE>
+                ((T *)inout_buffer + read_offset + i * SIMD_COMPUTE, properties{ alignment<ALIGN> });
 
         }
     }
@@ -125,8 +126,8 @@ void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int t
 #pragma unroll
         for (uint32_t i = 0; i < TEMP_WORLD; i++)
         {
-            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                ((T *)inout_buffer + read_offset + i * SIMD_COMPUTE);
+            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE>
+                ((T *)inout_buffer + read_offset + i * SIMD_COMPUTE, properties{ alignment<ALIGN> });
 
         }
     }
@@ -142,8 +143,8 @@ void load_input_to_temp_buffer(int idx, void* inout_buffer, uint32_t size, int t
 #pragma unroll
     for (uint32_t i = 0; i < TEMP_WORLD; i++)
     {
-        lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-            (ptr + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));
+        block_store<T, SIMD_COMPUTE>
+            (ptr + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i), properties{ alignment<ALIGN> });
     }
 }
 
@@ -164,14 +165,12 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-            ((T *)ptr_even + i * SIMD_COMPUTE);
+        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE> ((T *)ptr_even + i * SIMD_COMPUTE, properties{ alignment<ALIGN> });
     }
 #pragma unroll
     for (i = TEMP_WORLD / 2; i < TEMP_WORLD; i++)
     {
-        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-            ((T *)ptr_odd + (i - TEMP_WORLD / 2) * SIMD_COMPUTE);
+        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE> ((T *)ptr_odd + (i - TEMP_WORLD / 2) * SIMD_COMPUTE, properties{ alignment<ALIGN> });
     }
     sum = buffer.template select<SIMD_COMPUTE * TEMP_WORLD / 2, 1>(0) + buffer.template select<SIMD_COMPUTE * TEMP_WORLD / 2, 1>(SIMD_COMPUTE * TEMP_WORLD / 2);
 
@@ -184,8 +183,8 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
         {
             T * ptr = (T*)temp_buffer[i];
             ptr += idx * SIMD_COMPUTE * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_COMPUTE;
-            lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-                (ptr + (temp_rank / 2) * SIMD_COMPUTE, sum.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)));
+            block_store<T, SIMD_COMPUTE>
+                (ptr + (temp_rank / 2) * SIMD_COMPUTE, sum.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)), properties{ alignment<ALIGN> });
         }
     }
     else
@@ -195,8 +194,8 @@ void local_sum_and_distribute_to_remote_ranks(int idx, void* inout_buffer, uint3
         {
             T * ptr = (T*)temp_buffer[i];
             ptr += idx * SIMD_COMPUTE * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + TEMP_WORLD * SIMD_COMPUTE;
-            lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-                (ptr + (temp_rank / 2) * SIMD_COMPUTE, sum.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)));
+            block_store<T, SIMD_COMPUTE>
+                (ptr + (temp_rank / 2) * SIMD_COMPUTE, sum.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)), properties{ alignment<ALIGN> });
         }
     }
 }
@@ -216,8 +215,7 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
 #pragma unroll
     for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
     {
-        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-            ((T *)ptr + i * SIMD_COMPUTE);
+        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE> ((T *)ptr + i * SIMD_COMPUTE, properties{ alignment<ALIGN> });
     }
 #pragma unroll
     for (uint32_t i = 0; i < TEMP_WORLD / 2; i++)
@@ -225,8 +223,8 @@ void all_sum(int idx, void* inout_buffer, uint32_t size, int threads_already_pro
         sum = sum + buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i);
     }
     //store the result
-    lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back> //save the all sum in the second half of the temp slot.
-        (ptr, sum);
+    block_store<T, SIMD_COMPUTE> //save the all sum in the second half of the temp slot.
+        (ptr, sum, properties{ alignment<ALIGN> });
 }
 
 template <uint32_t TEMP_WORLD, typename T>
@@ -246,8 +244,7 @@ void gather_from_remote_and_dist_to_rank_pair(int idx, void* inout_buffer, uint3
             //read the values
             T *read_ptr_int = (T*)temp_buffer[i];
             read_ptr_int += idx * SIMD_COMPUTE * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + SIMD_COMPUTE * TEMP_WORLD; //get the sum from the second half of temp slot
-            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-                (read_ptr_int);
+            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)) = block_load<T, SIMD_COMPUTE> (read_ptr_int, properties{ alignment<ALIGN> });
         }
 
     }
@@ -259,8 +256,7 @@ void gather_from_remote_and_dist_to_rank_pair(int idx, void* inout_buffer, uint3
             //read the values
             T *read_ptr_int = (T*)temp_buffer[i];
             read_ptr_int += idx * SIMD_COMPUTE * TEMP_WORLD * 2 + size_per_buffer_kernel * buffer_index_kernel + SIMD_COMPUTE * TEMP_WORLD; //get the sum from the second half of temp slot
-            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-                (read_ptr_int);
+            buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * (i / 2)) = block_load<T, SIMD_COMPUTE> (read_ptr_int, properties{ alignment<ALIGN> });
         }
 
     }
@@ -274,14 +270,14 @@ void gather_from_remote_and_dist_to_rank_pair(int idx, void* inout_buffer, uint3
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-            (ptr_even + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));//save the results in the first half of temp slot
+        block_store<T, SIMD_COMPUTE>
+            (ptr_even + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i), properties{ alignment<ALIGN> });//save the results in the first half of temp slot
     }
 #pragma unroll
     for (i = 0; i < TEMP_WORLD / 2; i++)
     {
-        lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::write_back>
-            (ptr_odd + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));//save the results in the first half of temp slot
+        block_store<T, SIMD_COMPUTE>
+            (ptr_odd + i * SIMD_COMPUTE, buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i), properties{ alignment<ALIGN> });//save the results in the first half of temp slot
     }
 }
 
@@ -299,8 +295,7 @@ void write_output(int idx, void* inout_buffer, uint32_t size, int threads_alread
     for (uint32_t i = 0; i < TEMP_WORLD; i++)
     {
         //read the values
-        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = lsc_block_load<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::cached>
-            (read_ptr_int + i * SIMD_COMPUTE);
+        buffer.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i) = block_load<T, SIMD_COMPUTE> (read_ptr_int + i * SIMD_COMPUTE, properties{ alignment<ALIGN> });
     }
 
     //write out the results
@@ -313,8 +308,7 @@ void write_output(int idx, void* inout_buffer, uint32_t size, int threads_alread
         int count = (size - write_offset + SIMD_COMPUTE - 1) / SIMD_COMPUTE;
         for (int i = 0; i < count; i++)
         {
-            lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                (write_ptr + i * SIMD_COMPUTE, results.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));
+            block_store<T, SIMD_COMPUTE> (write_ptr + i * SIMD_COMPUTE, results.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i), properties{ alignment<ALIGN> });
         }
     }
     else
@@ -322,8 +316,7 @@ void write_output(int idx, void* inout_buffer, uint32_t size, int threads_alread
 #pragma unroll
         for (uint32_t i = 0; i < TEMP_WORLD; i++)
         {
-            lsc_block_store<T, SIMD_COMPUTE, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                (write_ptr + i * SIMD_COMPUTE, results.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i));
+            block_store<T, SIMD_COMPUTE> (write_ptr + i * SIMD_COMPUTE, results.template select<SIMD_COMPUTE, 1>(SIMD_COMPUTE * i), properties{ alignment<ALIGN> });
         }
     }
 
@@ -374,11 +367,11 @@ public:
                   data_type * ptr = (data_type*)local_buffer + index;
                   data_type * ptr2 = (data_type*)local_buffer + index + size_per_buffer_kernel;
                   //init the sync buffer in two sub-buffers instead of all 5 buffers. Only two are used by sync kernels.
-                  lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                      (ptr, grf);
-                  lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
-                      (ptr2, grf);
-                  lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+                  block_store<data_type, SIMD_INIT>(ptr, grf, properties{ alignment<ALIGN> });
+                  //lsc_block_store<data_type, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
+                  block_store<data_type, SIMD_INIT>(ptr2, grf, properties{ alignment<ALIGN> });
+                  //lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+		  fence<memory_kind::global, fence_flush_op::none, fence_scope::gpus>();
 
                 });
         });
@@ -881,7 +874,7 @@ private:
 
         // Step 2: Get IPC mem handle from base address
         alignas(64) exchange_contents send_buf;
-        alignas(64) exchange_contents recv_buf[world];
+        alignas(64) exchange_contents recv_buf[MAX_RANK];
 
         // fill in the exchange info
         zeCheck(zeMemGetIpcHandle(l0_ctx, base_addr, &send_buf.ipc_handle));

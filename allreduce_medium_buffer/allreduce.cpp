@@ -213,7 +213,8 @@ int main(int argc, char* argv[]) {
             sycl::half * ptr = (sycl::half*)buffer;
             lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
-            lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+            //lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+	    fence<memory_kind::global, fence_flush_op::none, fence_scope::gpus>();
           });
   });
   e.wait();
@@ -241,7 +242,8 @@ int main(int argc, char* argv[]) {
             sycl::half * ptr = (sycl::half*)buffer;
             lsc_block_store<sycl::half, SIMD_INIT, lsc_data_size::default_size, cache_hint::uncached, cache_hint::uncached>
                 (ptr + index, grf);
-            lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+            //lsc_fence<lsc_memory_kind::untyped_global, lsc_fence_op::none, lsc_scope::system>();
+	    fence<memory_kind::global, fence_flush_op::none, fence_scope::gpus>();
           });
   });
   e.wait();
@@ -277,7 +279,7 @@ int main(int argc, char* argv[]) {
     std::cout<< "rank" << rank << ":###################### Error occured when fill remote buffer ##############################"<<std::endl;
 
   // Clean up, close/put ipc handles, free memory, etc.
-  ar.release(queue);
+//  ar.release(queue);
   sycl::free(buffer, queue);
   sycl::free(host_buffer, queue);
 }

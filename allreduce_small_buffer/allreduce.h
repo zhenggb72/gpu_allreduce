@@ -199,7 +199,7 @@ public:
         int size_per_buffer_kernel = size_per_buffer;
         uint32_t total_threads_dispatched = (total_threads_needed + wg_size - 1) / wg_size * wg_size;
         uint32_t total_wg_count = total_threads_dispatched / wg_size;
-        //printf("rank%d required gpu hw thread count = %d, dispatched %d threads\n", rank, total_threads_needed, total_threads_dispatched);
+        printf("rank%d required gpu hw thread count = %d, dispatched %d threads\n", rank, total_threads_needed, total_threads_dispatched);
 
         for (r = 0; r < repetition; r++)
         {
